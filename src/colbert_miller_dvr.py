@@ -17,17 +17,30 @@ def dvr_p(a, b, N, limit):
     """
 
     dx = (b - a) / N
-    p = np.zeros((N, N), dtype=complex)
-    for iket in range(N):
-        for ibra in range(N):
-            if (iket == ibra):
-                p[iket,ibra] += 0
-            else:
-                p[iket,ibra] += 1j * (-1)**(iket - ibra) / (dx * (iket - ibra))
+
+    match limit:
+        case None:
+            p = np.zeros((N-2, N-2), dtype=complex)
+            for iket in range(1,N-1):
+                for ibra in range(1,N-1):
+                    if (iket == ibra):
+                        p[iket-1,ibra-1] += 1j * 1 / (b - a) * np.pi / 4 * (np.sin(2 * np.pi * iket / N) / np.sin(np.pi * iket / N)**2)
+                    else:
+                        p[iket-1,ibra-1] += 1j * (-1)**(iket - ibra) / (b - a) * np.pi / 4 * (np.sin(np.pi * (iket - ibra) / N) / np.sin(np.pi * (iket - ibra) / (2 * N))**2 + np.sin(np.pi * (iket + ibra) / N) / np.sin(np.pi * (iket + ibra) / (2 * N))**2)
+
+        case "(-inf,inf)":
+            p = np.zeros((N, N), dtype=complex)
+            for iket in range(N):
+                for ibra in range(N):
+                    if (iket == ibra):
+                        p[iket,ibra] += 0
+                    else:
+                        p[iket,ibra] += 1j * (-1)**(iket - ibra) / (dx * (iket - ibra))
+
     return p
 
 
-def dvr_T(m, a, b, N, limit):
+def dvr_T(m, a, b, N, limit=None):
     """
 
     Generates the Colbert-Miller DVR kinetic energy matrix
@@ -45,13 +58,25 @@ def dvr_T(m, a, b, N, limit):
     """
 
     dx = (b - a) / N
-    T = np.zeros((N, N), dtype=complex)
-    for iket in range(N):
-        for ibra in range(N):
-            if (iket == ibra):
-                T[iket,ibra] += np.pi**2 / (6 * m * dx**2)
-            else:
-                T[iket,ibra] += (-1)**(iket - ibra) / (m * dx**2 * (iket - ibra)**2)
+
+    match limit:
+        case None:
+            T = np.zeros((N-2, N-2), dtype=complex)
+            for iket in range(1,N-1):
+                for ibra in range(1,N-1):
+                    if (iket == ibra):
+                        T[iket-1,ibra-1] += 1 / (2 * m) * 1 / (b - a)**2 * np.pi**2 / 2 * ((2 * N**2 + 1) / 3  - 1 / np.sin(np.pi * iket / N)**2)
+                    else:
+                        T[iket-1,ibra-1] += 1 / (2 * m) * (-1)**(iket - ibra) / (b - a)**2 * np.pi**2 / 2 * (1 / np.sin(np.pi * (iket - ibra) / (2 * N))**2 - 1 / np.sin(np.pi * (iket + ibra) / (2 * N))**2)
+
+        case "(-inf,inf)":
+            T = np.zeros((N, N), dtype=complex)
+            for iket in range(N):
+                for ibra in range(N):
+                    if (iket == ibra):
+                        T[iket,ibra] += np.pi**2 / (6 * m * dx**2)
+                    else:
+                        T[iket,ibra] += (-1)**(iket - ibra) / (m * dx**2 * (iket - ibra)**2)
     return T
 
 
