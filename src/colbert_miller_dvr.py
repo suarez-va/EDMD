@@ -1,24 +1,57 @@
 import numpy as np
 
-def dvr_p(dx, a, b, N):
+def dvr_p(a, b, N, limit):
     """
 
     Generates the Colbert-Miller DVR momentum matrix
 
     Args:     
-        dx ( float ): separation between grid points
-        ham_old ( Hamiltonian ): Hamiltonian at time t-dt [units: a.u. of energy]
-        ham_cur ( Hamiltonian ): Hamiltonian at time t [units: a.u. of energy]
-        orb ( list of ints ): indices of the orbitals included in the active space. The Hvib dimensions will 
-            be determined by the N_act = len(orb) and the elements of Hvib will reflect only the orbitals included 
-            in this active state. Indexing starts with 0.
-        dt ( float ): Time step [units: a.u. of time]
+        a ( float ): lower bound of the DVR grid
+        b ( float ): upper bound of the DVR grid
+        N ( int ): number of DVR grid points
+        limit ( str ): analytical limits to be applied such as infinite bounds limits
 
     Returns:
-        CMATRIX(N_act,N_act): vibronic Hamiltonian matrix in the MO basis:  Hvib = Hel - i*hbar*d_ij
+        p ( np.array ): the Colbert-Miller DVR momentum matrix
 
     """
 
-    return None
+    dx = (b - a) / N
+    p = np.zeros((N, N), dtype=complex)
+    for iket in range(N):
+        for ibra in range(N):
+            if (iket == ibra):
+                p[iket,ibra] += 0
+            else:
+                p[iket,ibra] += 1j * (-1)**(iket - ibra) / (dx * (iket - ibra))
+    return p
+
+
+def dvr_T(m, a, b, N, limit):
+    """
+
+    Generates the Colbert-Miller DVR kinetic energy matrix
+
+    Args:     
+        m ( float ): mass of the particle
+        a ( float ): lower bound of the DVR grid
+        b ( float ): upper bound of the DVR grid
+        N ( int ): number of DVR grid points
+        limit ( str ): analytical limits to be applied such as infinite bounds limits
+
+    Returns:
+        T ( np.array ): the Colbert-Miller DVR kinetic energy matrix
+
+    """
+
+    dx = (b - a) / N
+    T = np.zeros((N, N), dtype=complex)
+    for iket in range(N):
+        for ibra in range(N):
+            if (iket == ibra):
+                T[iket,ibra] += np.pi**2 / (6 * m * dx**2)
+            else:
+                T[iket,ibra] += (-1)**(iket - ibra) / (m * dx**2 * (iket - ibra)**2)
+    return T
 
 
