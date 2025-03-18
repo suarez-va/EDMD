@@ -1,7 +1,46 @@
 import numpy as np
 
-def get_Tp(m, a, b, N, ref="T", limit=None):
-   return None
+def dvr_xn(n, a, b, N, limit=None):
+    """
+
+    Generates the Colbert-Miller DVR position matrix raised to the n
+
+    Args:     
+        n ( int ): position operator power x^n
+        a ( float ): lower bound of the DVR grid
+        b ( float ): upper bound of the DVR grid
+        N ( int ): number of DVR grid points
+        limit ( str ): analytical limits to be applied such as infinite bounds limits
+
+    Returns:
+        xn ( np.array ): the Colbert-Miller DVR position matrix raised to the n
+
+    """
+
+    dx = (b - a) / N
+
+    match limit:
+        case None:
+            xn = np.zeros((N-1, N-1), dtype=complex)
+            for i in range(N-1):
+                xi = a + dx * (i + 1)
+                xn[i,i] += xi**n 
+
+        case "(0,inf)":
+            xn = np.zeros((N, N), dtype=complex)
+            for i in range(N):
+                xi = a + dx * (i + 1)
+                xn[i,i] += xi**n 
+
+        case "(-inf,inf)":
+            xn = np.zeros((N+1, N+1), dtype=complex)
+            for i in range(N+1):
+                xi = a + dx * i
+                xn[i,i] += xi**n 
+
+    return xn
+
+
 
 def dvr_T(m, a, b, N, limit=None):
     """
@@ -101,5 +140,8 @@ def dvr_p(a, b, N, limit):
 
 
     return p
+
+def dvr_Tp(m, a, b, N, ref="T", limit=None):
+   return None
 
 
