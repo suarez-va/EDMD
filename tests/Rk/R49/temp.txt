@@ -1,0 +1,6 @@
+this is a temp file, maybe practice replacing the replace in all caps thing below?
+
+
+r = 19.7372
+no19.7372
+

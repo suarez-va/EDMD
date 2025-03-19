@@ -4,7 +4,7 @@ import numpy as np
 
 sys.path.append(os.path.abspath("../src"))
 from colbert_miller_dvr import dvr_p, dvr_T
-from models.two_electron_screened_diatomic import generate_Hele
+from models.two_electron_screened_diatomic import generate_Hele, generate_dipole, generate_cap
 
 R = 2.08
 params = {
@@ -19,8 +19,18 @@ params = {
     "mA": 36443.98900696,
     "mB": 7294.29954142,
     "xmax": 25.0,
-    "xpts": 25
+    "xpts": 25,
+    "xcap": 17.5,
+    "etacap": 1.0,
+    "ncap": 3
 }
 
+print("1:")
 print(generate_Hele(R, params))
+
+print("2:")
+print(generate_dipole(R, params))
+
+print("3:")
+print(generate_cap(R, params))
 

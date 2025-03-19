@@ -1,6 +1,7 @@
 import numpy as np
 
-def dvr_xn(n, a, b, N, limit=None):
+
+def dvr_xn(n, a, b, N, bounds="(a,b)"):
     """
 
     Generates the Colbert-Miller DVR position matrix raised to the n
@@ -10,7 +11,7 @@ def dvr_xn(n, a, b, N, limit=None):
         a ( float ): lower bound of the DVR grid
         b ( float ): upper bound of the DVR grid
         N ( int ): number of DVR grid points
-        limit ( str ): analytical limits to be applied such as infinite bounds limits
+        bounds ( str ): analytical limits to be applied such as infinite bounds limits
 
     Returns:
         xn ( np.array ): the Colbert-Miller DVR position matrix raised to the n
@@ -19,8 +20,8 @@ def dvr_xn(n, a, b, N, limit=None):
 
     dx = (b - a) / N
 
-    match limit:
-        case None:
+    match bounds:
+        case "(a,b)":
             xn = np.zeros((N-1, N-1), dtype=complex)
             for i in range(N-1):
                 xi = a + dx * (i + 1)
@@ -41,8 +42,56 @@ def dvr_xn(n, a, b, N, limit=None):
     return xn
 
 
+def dvr_p(a, b, N, bounds="(a,b)"):
+    """
 
-def dvr_T(m, a, b, N, limit=None):
+    Generates the Colbert-Miller DVR momentum matrix
+
+    Args:     
+        a ( float ): lower bound of the DVR grid
+        b ( float ): upper bound of the DVR grid
+        N ( int ): number of DVR grid points
+        bounds ( str ): analytical limits to be applied such as infinite bounds limits
+
+    Returns:
+        p ( np.array ): the Colbert-Miller DVR momentum matrix
+
+    """
+
+    dx = (b - a) / N
+
+    match bounds:
+        case "(a,b)":
+            p = np.zeros((N-1, N-1), dtype=complex)
+            for iket in range(N-1):
+                for ibra in range(N-1):
+                    if (iket == ibra):
+                        p[iket,ibra] += 1j * 1 / (b - a) * np.pi / 4 * (np.sin(2 * np.pi * (iket + 1) / N) / np.sin(np.pi * (iket + 1) / N)**2)
+                    else:
+                        p[iket,ibra] += 1j * (-1)**(iket - ibra) / (b - a) * np.pi / 4 * (np.sin(np.pi * (iket - ibra) / N) / np.sin(np.pi * (iket - ibra) / (2 * N))**2 + np.sin(np.pi * (iket + ibra + 2) / N) / np.sin(np.pi * (iket + ibra + 2) / (2 * N))**2)
+
+        case "(0,inf)":
+            p = np.zeros((N, N), dtype=complex)
+            for iket in range(N):
+                for ibra in range(N):
+                    if (iket == ibra):
+                        p[iket,ibra] += 1j / (2 * dx * (iket + 1))
+                    else:
+                        p[iket,ibra] += 1j * (-1)**(iket - ibra) / dx * (1 / (iket - ibra) + 1 / (iket + ibra + 2))
+
+        case "(-inf,inf)":
+            p = np.zeros((N+1, N+1), dtype=complex)
+            for iket in range(N+1):
+                for ibra in range(N+1):
+                    if (iket == ibra):
+                        p[iket,ibra] += 0
+                    else:
+                        p[iket,ibra] += 1j * (-1)**(iket - ibra) / (dx * (iket - ibra))
+
+    return p
+
+
+def dvr_T(m, a, b, N, bounds="(a,b)"):
     """
 
     Generates the Colbert-Miller DVR kinetic energy matrix
@@ -52,7 +101,7 @@ def dvr_T(m, a, b, N, limit=None):
         a ( float ): lower bound of the DVR grid
         b ( float ): upper bound of the DVR grid
         N ( int ): number of DVR grid points
-        limit ( str ): analytical limits to be applied such as infinite bounds limits
+        bounds ( str ): analytical limits to be applied such as infinite bounds limits
 
     Returns:
         T ( np.array ): the Colbert-Miller DVR kinetic energy matrix
@@ -61,29 +110,29 @@ def dvr_T(m, a, b, N, limit=None):
 
     dx = (b - a) / N
 
-    match limit:
-        case None:
-            T = np.zeros((N-2, N-2), dtype=complex)
-            for iket in range(1,N-1):
-                for ibra in range(1,N-1):
+    match bounds:
+        case "(a,b)":
+            T = np.zeros((N-1, N-1), dtype=complex)
+            for iket in range(N-1):
+                for ibra in range(N-1):
                     if (iket == ibra):
-                        T[iket-1,ibra-1] += 1 / (2 * m) * 1 / (b - a)**2 * np.pi**2 / 2 * ((2 * N**2 + 1) / 3  - 1 / np.sin(np.pi * iket / N)**2)
+                        T[iket,ibra] += 1 / (2 * m) * 1 / (b - a)**2 * np.pi**2 / 2 * ((2 * N**2 + 1) / 3 - 1 / np.sin(np.pi * (iket + 1) / N)**2)
                     else:
-                        T[iket-1,ibra-1] += 1 / (2 * m) * (-1)**(iket - ibra) / (b - a)**2 * np.pi**2 / 2 * (1 / np.sin(np.pi * (iket - ibra) / (2 * N))**2 - 1 / np.sin(np.pi * (iket + ibra) / (2 * N))**2)
+                        T[iket,ibra] += 1 / (2 * m) * (-1)**(iket - ibra) / (b - a)**2 * np.pi**2 / 2 * (1 / np.sin(np.pi * (iket - ibra) / (2 * N))**2 - 1 / np.sin(np.pi * (iket + ibra + 2) / (2 * N))**2)
 
         case "(0,inf)":
-            T = np.zeros((N-1, N-1), dtype=complex)
-            for iket in range(1,N):
-                for ibra in range(1,N):
-                    if (iket == ibra):
-                        T[iket-1,ibra-1] += 1 / (2 * m * dx**2) * (np.pi**2 / 3 - 1 / (2 * iket**2))
-                    else:
-                        T[iket-1,ibra-1] += (-1)**(iket - ibra) / (2 * m * dx**2) * (2 / (iket - ibra)**2 - 2 / (iket + ibra)**2)
-
-        case "(-inf,inf)":
             T = np.zeros((N, N), dtype=complex)
             for iket in range(N):
                 for ibra in range(N):
+                    if (iket == ibra):
+                        T[iket,ibra] += 1 / (2 * m * dx**2) * (np.pi**2 / 3 - 1 / (2 * (iket + 1)**2))
+                    else:
+                        T[iket,ibra] += (-1)**(iket - ibra) / (2 * m * dx**2) * (2 / (iket - ibra)**2 - 2 / (iket + ibra + 2)**2)
+
+        case "(-inf,inf)":
+            T = np.zeros((N+1, N+1), dtype=complex)
+            for iket in range(N+1):
+                for ibra in range(N+1):
                     if (iket == ibra):
                         T[iket,ibra] += np.pi**2 / (6 * m * dx**2)
                     else:
@@ -92,56 +141,47 @@ def dvr_T(m, a, b, N, limit=None):
     return T
 
 
-def dvr_p(a, b, N, limit):
+def dvr_W(a, b, N, acap, bcap, eta, n, bounds="(a,b)"):
     """
 
-    Generates the Colbert-Miller DVR momentum matrix
+    Generates a Complex Absorbing Potential (CAP) in the Colbert-Miller DVR basis
 
     Args:     
         a ( float ): lower bound of the DVR grid
         b ( float ): upper bound of the DVR grid
         N ( int ): number of DVR grid points
-        limit ( str ): analytical limits to be applied such as infinite bounds limits
+        acap ( float ): lower bound of the CAP
+        bcap ( float ): upper bound of the CAP
+        eta ( float ): CAP scaling constant eta
+        n ( int ): CAP scaling power (x - xcap)^n
+        bounds ( str ): analytical limits to be applied such as infinite bounds limits
 
     Returns:
-        p ( np.array ): the Colbert-Miller DVR momentum matrix
+        W ( np.array ): a CAP in the Colbert-Miller DVR basis
 
     """
 
     dx = (b - a) / N
 
-    match limit:
-        case None:
-            p = np.zeros((N-2, N-2), dtype=complex)
-            for iket in range(1,N-1):
-                for ibra in range(1,N-1):
-                    if (iket == ibra):
-                        p[iket-1,ibra-1] += 1j * 1 / (b - a) * np.pi / 4 * (np.sin(2 * np.pi * iket / N) / np.sin(np.pi * iket / N)**2)
-                    else:
-                        p[iket-1,ibra-1] += 1j * (-1)**(iket - ibra) / (b - a) * np.pi / 4 * (np.sin(np.pi * (iket - ibra) / N) / np.sin(np.pi * (iket - ibra) / (2 * N))**2 + np.sin(np.pi * (iket + ibra) / N) / np.sin(np.pi * (iket + ibra) / (2 * N))**2)
+    match bounds:
+        case "(a,b)":
+            W = np.zeros((N-1, N-1), dtype=complex)
+            for i in range(N-1):
+                xi = a + dx * (i + 1)
+                W[i,i] += 0
 
         case "(0,inf)":
-            p = np.zeros((N-1, N-1), dtype=complex)
-            for iket in range(1,N):
-                for ibra in range(1,N):
-                    if (iket == ibra):
-                        p[iket-1,ibra-1] += 1j / (2 * dx * iket)
-                    else:
-                        p[iket-1,ibra-1] += 1j * (-1)**(iket - ibra) / dx * (1 / (iket - ibra) + 1 / (iket + ibra))
+            W = np.zeros((N, N), dtype=complex)
+            for i in range(N):
+                xi = a + dx * (i + 1)
+                W[i,i] += -1j * eta * (xi - bcap)**n * np.heaviside(xi - bcap, 0.5)
 
         case "(-inf,inf)":
-            p = np.zeros((N, N), dtype=complex)
-            for iket in range(N):
-                for ibra in range(N):
-                    if (iket == ibra):
-                        p[iket,ibra] += 0
-                    else:
-                        p[iket,ibra] += 1j * (-1)**(iket - ibra) / (dx * (iket - ibra))
+            W = np.zeros((N+1, N+1), dtype=complex)
+            for i in range(N+1):
+                xi = a + dx * i
+                W[i,i] += -1j * eta * ((xi - bcap)**n * np.heaviside(xi - bcap, 0.5) + (-1)**n * (xi - acap)**n * np.heaviside(-(xi - acap), 0.5))
 
-
-    return p
-
-def dvr_Tp(m, a, b, N, ref="T", limit=None):
-   return None
+    return W
 
 
