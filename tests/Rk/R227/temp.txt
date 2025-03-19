@@ -1,6 +1,0 @@
-this is a temp file, maybe practice replacing the replace in all caps thing below?
-
-
-r = 91.43560000000001
-no91.43560000000001
-

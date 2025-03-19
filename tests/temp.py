@@ -1,8 +1,6 @@
 import numpy as np
-from colbert_miller_dvr import dvr_p, dvr_T
 from models.two_electron_screened_diatomic import generate_Hele, generate_dipole, generate_cap
 
-R = 2.08
 params = {
     "aee": 0.02,
     "bee": 0.25,
@@ -21,12 +19,14 @@ params = {
     "ncap": 3
 }
 
-print("1:")
-print(generate_Hele(R, params))
+Hele = generate_Hele(REPLACE, params)
+dipole = generate_dipole(REPLACE, params)
+cap = generate_cap(REPLACE, params)
 
-print("2:")
-print(generate_dipole(R, params))
+E, C = np.linalg.eigh(Hele)
 
-print("3:")
-print(generate_cap(R, params))
+np.savetxt('E.dat', E)
+np.savetxt('C.dat', C)
+np.savetxt( 'dipole.dat', np.linalg.multi_dot([np.conj(C.T), dipole, C]))
+np.savetxt( 'cap.dat', np.linalg.multi_dot([np.conj(C.T), cap, C]))
 
