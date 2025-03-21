@@ -22,8 +22,6 @@ def generate_Hele(R, params):
 
     aee = params["aee"]
     bee = params["bee"]
-    aR = params["aR"]
-    bR = params["bR"]
     aAe = params["aAe"]
     bAe = params["bAe"]
     aBe = params["aBe"]
@@ -39,11 +37,11 @@ def generate_Hele(R, params):
     # generate hcore using Colbert-Miller syle DVR for kinetic energy
     hcore = dvr_T(mu, -xmax, xmax, xpts-1, "(-inf,inf)")
     for i in range(xpts):
-        xi = -xmax + dx * i; Aarg = (xi + mu / mA * R)**2; Barg = (xi - mu / mB * R)**2
-        hcore[i,i] += -np.exp(-aAe * Aarg) / np.sqrt(Aarg + bAe)
-        hcore[i,i] += -np.exp(-aBe * Barg) / np.sqrt(Barg + bBe)
+        xi = -xmax + dx * i; Aarg = (xi + mu / mA * R); Barg = (xi - mu / mB * R)
+        hcore[i,i] += -np.exp(-aAe * Aarg**2) / np.sqrt(Aarg**2 + bAe)
+        hcore[i,i] += -np.exp(-aBe * Barg**2) / np.sqrt(Barg**2 + bBe)
 
-    # generate full CI Hamiltonian matrix
+    # generate full CI Hele matrix
     nstates = int(xpts * (xpts - 1) / 2)
     mapping = map_CI(xpts)
     Hele = np.zeros((nstates, nstates), dtype=complex)
@@ -71,6 +69,51 @@ def generate_Hele(R, params):
                     Hele[mapping[iket,j],mapping[ibra,j]] += hcore[iket,ibra]
 
     return Hele
+
+
+def generate_dHele(R, params):
+
+    aAe = params["aAe"]
+    bAe = params["bAe"]
+    aBe = params["aBe"]
+    bBe = params["bBe"]
+    mA = params["mA"]
+    mB = params["mB"]
+    xmax = params["xmax"]
+    xpts = params["xpts"]
+
+    mu = mA * mB / (mA + mB)
+    dx = (2 * xmax) / (xpts - 1)
+
+    # generate dhcore
+    hcore = np.zeros((xpts, xpts), dtype=complex)
+    for i in range(xpts):
+        xi = -xmax + dx * i; Aarg = (xi + mu / mA * R); Barg = (xi - mu / mB * R)
+        hcore[i,i] += mu / mA * (2 * aAe + 1 / (Aarg**2 + bAe)) * Aarg * np.exp(-aAe * Aarg**2) / np.sqrt(Aarg**2 + bAe)
+        hcore[i,i] += -mu / mB * (2 * aBe + 1 / (Barg**2 + bBe)) * Barg * np.exp(-aBe * Barg**2) / np.sqrt(Barg**2 + bBe)
+
+    # generate full CI dHele matrix
+    nstates = int(xpts * (xpts - 1) / 2)
+    mapping = map_CI(xpts)
+    Hele = np.zeros((nstates, nstates), dtype=complex)
+    # iket == ibra and jket == jbra
+    for i in range(xpts):
+        for j in range(i+1,xpts):
+            Hele[mapping[i,j],mapping[i,j]] += hcore[i,i] + hcore[j,j]
+
+    return Hele
+
+
+def calculate_nac(E, dHele_adi):
+    nstates = E.shape[0]
+    nac = np.zeros((nstates, nstates), dtype=complex)
+    for i in range(nstates):
+        for j in range(nstates):
+            if i == j:
+                pass
+            else:
+                nac[i,j] = dHele_adi[i,j] / (E[j] - E[i])
+    return nac
 
 
 def generate_dipole(R, params):

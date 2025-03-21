@@ -1,5 +1,5 @@
 import numpy as np
-from models.two_electron_screened_diatomic import generate_Hele, generate_dipole, generate_cap
+from models.two_electron_screened_diatomic import generate_Hele, generate_dHele, calculate_nac, generate_dipole, generate_cap
 
 params = {
     "aee": 0.02,
@@ -20,13 +20,19 @@ params = {
 }
 
 Hele = generate_Hele(REPLACE, params)
-dipole = generate_dipole(REPLACE, params)
-cap = generate_cap(REPLACE, params)
-
 E, C = np.linalg.eigh(Hele)
+
+dHele = np.linalg.multi_dot([np.conj(C.T), generate_dHele(REPLACE, params), C])
+nac1 = calculate_nac(E, dHele)
+nac2 = np.einsum('ij,jk->ik', nac1, nac1)
+dipole = np.linalg.multi_dot([np.conj(C.T), generate_dipole(REPLACE, params), C])
+cap = np.linalg.multi_dot([np.conj(C.T), generate_cap(REPLACE, params), C])
 
 np.savetxt('E.dat', E)
 np.savetxt('C.dat', C)
-np.savetxt( 'dipole.dat', np.linalg.multi_dot([np.conj(C.T), dipole, C]))
-np.savetxt( 'cap.dat', np.linalg.multi_dot([np.conj(C.T), cap, C]))
+np.savetxt('dHele.dat', dHele)
+np.savetxt('nac1.dat', nac1)
+np.savetxt('nac2.dat', nac2)
+np.savetxt('dipole.dat', dipole)
+np.savetxt('cap.dat', cap)
 
