@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 sys.path.append(os.path.abspath("../src"))
-from colbert_miller_dvr import dvr_xn, dvr_T, dvr_W
+from grid_utils.colbert_miller_dvr import dvr_xn, dvr_T, dvr_W
 
 
 def map_CI(xpts):
@@ -16,6 +16,51 @@ def map_CI(xpts):
             k += 1
 
     return mapping
+
+
+def generate_dipole(R, params):
+
+    xmax = params["xmax"]
+    xpts = params["xpts"]
+
+    dx = (2 * xmax) / (xpts - 1)
+
+    # generate 1 electron transition dipole matrix in the Colbert-Miller DVR basis
+    hcore = -dvr_xn(1, -xmax, xmax, xpts-1, "(-inf,inf)")
+
+    # generate full CI dipole matrix
+    nstates = int(xpts * (xpts - 1) / 2)
+    mapping = map_CI(xpts)
+    dipole = np.zeros((nstates, nstates), dtype=complex)
+    for i in range(xpts):
+        for j in range(i+1,xpts):
+            dipole[mapping[i,j],mapping[i,j]] += hcore[i,i] + hcore[j,j]
+            
+    return dipole
+
+
+def generate_cap(R, params):
+
+    xmax = params["xmax"]
+    xpts = params["xpts"]
+    xcap = params["xcap"]
+    etacap = params["etacap"]
+    ncap = params["ncap"]
+
+    dx = (2 * xmax) / (xpts - 1)
+
+    # generate 1 electron CAP matrix in the Colbert-Miller DVR basis
+    hcore = dvr_W(-xmax, xmax, xpts-1, -xcap, xcap, etacap, ncap, "(-inf,inf)")
+
+    # generate full CI CAP matrix
+    nstates = int(xpts * (xpts - 1) / 2)
+    mapping = map_CI(xpts)
+    cap = np.zeros((nstates, nstates), dtype=complex)
+    for i in range(xpts):
+        for j in range(i+1,xpts):
+            cap[mapping[i,j],mapping[i,j]] += hcore[i,i] + hcore[j,j]
+            
+    return cap
 
 
 def generate_Hele(R, params):
@@ -103,60 +148,4 @@ def generate_dHele(R, params):
 
     return Hele
 
-
-def calculate_nac(E, dHele_adi):
-    nstates = E.shape[0]
-    nac = np.zeros((nstates, nstates), dtype=complex)
-    for i in range(nstates):
-        for j in range(nstates):
-            if i == j:
-                pass
-            else:
-                nac[i,j] = dHele_adi[i,j] / (E[j] - E[i])
-    return nac
-
-
-def generate_dipole(R, params):
-
-    xmax = params["xmax"]
-    xpts = params["xpts"]
-
-    dx = (2 * xmax) / (xpts - 1)
-
-    # generate 1 electron transition dipole matrix in the Colbert-Miller DVR basis
-    hcore = -dvr_xn(1, -xmax, xmax, xpts-1, "(-inf,inf)")
-
-    # generate full CI dipole matrix
-    nstates = int(xpts * (xpts - 1) / 2)
-    mapping = map_CI(xpts)
-    dipole = np.zeros((nstates, nstates), dtype=complex)
-    for i in range(xpts):
-        for j in range(i+1,xpts):
-            dipole[mapping[i,j],mapping[i,j]] += hcore[i,i] + hcore[j,j]
-            
-    return dipole
-
-
-def generate_cap(R, params):
-
-    xmax = params["xmax"]
-    xpts = params["xpts"]
-    xcap = params["xcap"]
-    etacap = params["etacap"]
-    ncap = params["ncap"]
-
-    dx = (2 * xmax) / (xpts - 1)
-
-    # generate 1 electron CAP matrix in the Colbert-Miller DVR basis
-    hcore = dvr_W(-xmax, xmax, xpts-1, -xcap, xcap, etacap, ncap, "(-inf,inf)")
-
-    # generate full CI CAP matrix
-    nstates = int(xpts * (xpts - 1) / 2)
-    mapping = map_CI(xpts)
-    cap = np.zeros((nstates, nstates), dtype=complex)
-    for i in range(xpts):
-        for j in range(i+1,xpts):
-            cap[mapping[i,j],mapping[i,j]] += hcore[i,i] + hcore[j,j]
-            
-    return cap
 
