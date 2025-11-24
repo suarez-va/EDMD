@@ -168,7 +168,8 @@ def dvr_W(a, b, N, acap, bcap, eta, n, bounds="(a,b)"):
             W = np.zeros((N-1, N-1), dtype=complex)
             for i in range(N-1):
                 xi = a + dx * (i + 1)
-                W[i,i] += 0
+                #W[i,i] += 0
+                W[i,i] += -1j * eta * ((xi - bcap)**n * np.heaviside(xi - bcap, 0.5) + (-1)**n * (xi - acap)**n * np.heaviside(-(xi - acap), 0.5))
 
         case "(0,inf)":
             W = np.zeros((N, N), dtype=complex)

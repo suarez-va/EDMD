@@ -1,8 +1,6 @@
 import numpy as np
 from grid_utils.colbert_miller_dvr import dvr_p, dvr_T, dvr_xn, dvr_W
 from models.two_electron_screened_diatomic import TESD, generate_Hele, generate_dHele, generate_dipole, generate_cap, Vnuc
-import matplotlib.pyplot as plt
-import time
 
 params = {
     "aee": 0.02,
@@ -16,10 +14,10 @@ params = {
     "mA": 36443.98900696,
     "mB": 7294.29954142,
     # max=20 then ndvr=150, but do more honestly if you want many digits
-    "xmax": 15.0,
-    "ndvr": 50,
-    "ncas": 50,
-    "xcap": 10.0,
+    "xmax": 11.0,
+    "ndvr": 75,
+    "ncas": 75,
+    "xcap": 8.5,
     "eta": REPLACE,
     "ncap": 4,
     "spin": "singlet"
@@ -36,6 +34,5 @@ Gam = E[:].imag
 
 np.savetxt('Er.dat', Er)
 np.savetxt('Gam.dat', Gam)
-np.savetxt('Cijn.dat', Cijn.reshape(model.ndvr**2, model.nfci))
-
+np.save('Cijn', Cijn)
 
