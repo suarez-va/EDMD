@@ -2,3 +2,10 @@ __pycache__/
 etan/
 Rk/
 
+*.dat
+*.txt
+*.out
+*.err
+*.npy
+*.npz
+# *.png

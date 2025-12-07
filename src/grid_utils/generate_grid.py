@@ -78,8 +78,66 @@ def create_eta_grid(coef, delta, npts, template_file):
 
     return None
 
-
 def sort_eta_data():
+    if not os.path.exists("etan"):
+        print("Missing grid data directory etan")
+        exit()
+    npts = int(os.popen("wc -l < etan/eta.dat").read().strip()) - 1
+
+    for n in range(1, npts + 1):
+        sub_dir_prev = os.path.join("etan", f"eta{n-1}")
+        sub_dir_curr = os.path.join("etan", f"eta{n}")
+        Clnm_prev = np.loadtxt(os.path.join(sub_dir_prev, "Clnm.dat"), dtype=np.complex128)
+        Crnm_prev = np.loadtxt(os.path.join(sub_dir_prev, "Crnm.dat"), dtype=np.complex128)
+        Er_curr= np.loadtxt(os.path.join(sub_dir_curr, "Er.dat"))
+        Gam_curr = np.loadtxt(os.path.join(sub_dir_curr, "Gam.dat"))
+        Clnm_curr = np.loadtxt(os.path.join(sub_dir_curr, "Clnm.dat"), dtype=np.complex128)
+        Crnm_curr = np.loadtxt(os.path.join(sub_dir_curr, "Crnm.dat"), dtype=np.complex128)
+        #ovlp = np.einsum("ijn,ijm->nm", Cijn_prev, Cijn_curr)
+        #ovlp = np.absolute(np.tensordot(Cijn_prev, Cijn_curr, axes=([0,1],[0,1])))
+        #ovlp = np.matmul(Cnm_prev.conj().T, Cnm_curr)
+        ovlp = np.matmul(Clnm_prev.conj().T, Crnm_curr)
+        idx = np.argmax(np.absolute(ovlp), axis=1)
+        Er_sort = Er_curr[idx]
+        Gam_sort = Gam_curr[idx]
+        Clnm_sort = Clnm_curr[:,idx]
+        Crnm_sort = Crnm_curr[:,idx]
+        np.savetxt(os.path.join(sub_dir_curr, "Er.dat"), Er_sort)
+        np.savetxt(os.path.join(sub_dir_curr, "Gam.dat"), Gam_sort)
+        np.savetxt(os.path.join(sub_dir_curr, "Clnm.dat"), Clnm_sort)
+        np.savetxt(os.path.join(sub_dir_curr, "Crnm.dat"), Crnm_sort)
+        print(idx)
+        if idx.size != np.unique(idx).size:
+            print('DUPLICATE ABOVE!!!')
+            vals, counts = np.unique(idx, return_counts=True)
+            print(vals[counts > 1])
+
+    return None
+
+
+def get_eta_data(idx):
+    if not os.path.exists("etan"):
+        print("Missing grid data directory etan")
+        exit()
+    npts = int(os.popen("wc -l < etan/eta.dat").read().strip()) - 1
+
+    eta_data = np.loadtxt("etan/eta.dat")
+    Er_data = np.zeros(eta_data.shape[0])
+    Gam_data = np.zeros(eta_data.shape[0])
+
+    for n in range(npts + 1):
+        sub_dir_curr = os.path.join("etan", f"eta{n}")
+        Er_curr= np.loadtxt(os.path.join(sub_dir_curr, "Er.dat"))
+        Gam_curr = np.loadtxt(os.path.join(sub_dir_curr, "Gam.dat"))
+        Er_data[n] = Er_curr[idx]
+        Gam_data[n] = Gam_curr[idx]
+
+    return eta_data, Er_data, Gam_data
+
+
+
+
+def sort_eta_data_old():
     if not os.path.exists("etan"):
         print("Missing grid data directory etan")
         exit()

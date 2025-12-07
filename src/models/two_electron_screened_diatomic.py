@@ -1,6 +1,9 @@
 import sys
 import os
 import numpy as np
+from scipy.linalg import eigh, eig
+from scipy.sparse.linalg import eigsh
+import time
 
 #sys.path.append(os.path.abspath("../src"))
 from grid_utils.colbert_miller_dvr import dvr_xn, dvr_T, dvr_W
@@ -21,16 +24,18 @@ class TESD(Model):
         assert self.spin in ("singlet", "triplet"), f"Spin multiplicity: {self.spin}, must be 'singlet' or 'triplet'."
         self.nfci = int((self.ndvr+1)*self.ndvr/2) if self.spin=="singlet" else int(self.ndvr*(self.ndvr-1)/2) if self.spin=="triplet" else 0
         self.map_ij, self.map_kl = np.triu_indices(self.ndvr, k=0) if self.spin=="singlet" else np.triu_indices(self.ndvr, k=1) if self.spin=="triplet" else np.zeros((self.nfci), dtype=int)
-        self.map_ikjl = np.full((self.ndvr, self.ndvr), -1, dtype=int)
-        self.map_ikjl[self.map_ij, self.map_kl] = np.arange(self.nfci)
-        self.En = np.zeros((self.nfci),dtype=np.complex128)
-        self.Cijn = np.zeros((self.ndvr,self.ndvr,self.nfci),dtype=np.complex128)
 
-        self.eta = self.params["eta"]
-        self.acap = -self.params["xcap"]
-        self.bcap = self.params["xcap"]
-        self.ncap = self.params["ncap"]
+        self.nbo = self.params["nbo"]
+        self.nbo = self.nfci if self.params["nbo"]==None else self.params["nbo"]
+        self.En = np.zeros((self.nbo), dtype=np.complex128)
+        self.Cijn = np.zeros((self.ndvr, self.ndvr, self.nbo), dtype=np.complex128)
 
+        #self.map_ikjl = np.full((self.ndvr, self.ndvr), -1, dtype=int)
+        #self.map_ikjl[self.map_ij, self.map_kl] = np.arange(self.nfci)
+        #self.eta = self.params["eta"]
+        #self.acap = -self.params["xcap"]
+        #self.bcap = self.params["xcap"]
+        #self.ncap = self.params["ncap"]
         #self.ncas = self.params["ncas"]
 
     def VR(self, R):
@@ -38,8 +43,10 @@ class TESD(Model):
         bR = self.params["bR"]
         return np.exp(-aR * R**2) / np.sqrt(R**2 + bR)
 
-    def xi(self):
-        return np.linspace(self.a, self.b, self.ndvr)
+    def dVR(self, R):
+        aR = self.params["aR"]
+        bR = self.params["bR"]
+        return -(2 * aR + 1 / (R**2 + bR)) * R * np.exp(-aR * R**2) / np.sqrt(R**2 + bR)
 
     def VeR(self, x, R):
         aAe = self.params["aAe"]
@@ -49,23 +56,19 @@ class TESD(Model):
         mA = self.params["mA"]
         mB = self.params["mB"]
         mu = mA * mB / (mA + mB)
-        Aarg = (x + mu / mA * R)**2; Barg = (x - mu / mB * R)**2
-        return -np.exp(-aAe * Aarg) / np.sqrt(Aarg + bAe) - np.exp(-aBe * Barg) / np.sqrt(Barg + bBe)
+        Aarg = (x + mu / mA * R); Barg = (x - mu / mB * R)
+        return -np.exp(-aAe * Aarg**2) / np.sqrt(Aarg**2 + bAe) - np.exp(-aBe * Barg**2) / np.sqrt(Barg**2 + bBe)
 
-    def hij(self, R):
-        # generate hcore using Colbert-Miller syle DVR for kinetic energy
-        h = dvr_T(1, self.a, self.b, self.N, self.bounds) + np.diag(self.VeR(self.xi(), R))
-        if self.eta != 0.0:
-            h += dvr_W(self.a, self.b, self.N, self.acap, self.bcap, self.eta, self.ncap, self.bounds)
-        return h
-
-    def solve_mos(self, R):
-        if self.eta == 0.0:
-            self.ep[:], self.cip = np.linalg.eigh(self.hij(R))
-        else:
-            e, c = np.linalg.eig(self.hij(R))
-            idx = np.argsort(e.real)
-            self.ep, self.cip = e[idx], c[:,idx]
+    def dVeR(self, x, R):
+        aAe = self.params["aAe"]
+        bAe = self.params["bAe"]
+        aBe = self.params["aBe"]
+        bBe = self.params["bBe"]
+        mA = self.params["mA"]
+        mB = self.params["mB"]
+        mu = mA * mB / (mA + mB)
+        Aarg = (x + mu / mA * R); Barg = (x - mu / mB * R)
+        return mu / mA * (2 * aAe + 1 / (Aarg**2 + bAe)) * Aarg * np.exp(-aAe * Aarg**2) / np.sqrt(Aarg**2 + bAe) - mu / mB * (2 * aBe + 1 / (Barg**2 + bBe)) * Barg * np.exp(-aBe * Barg**2) / np.sqrt(Barg**2 + bBe)
 
     def Vee(self, x1, x2):
         aee = self.params["aee"]
@@ -73,6 +76,31 @@ class TESD(Model):
         xarg = (x1 - x2)**2
         return np.exp(-aee * xarg) / np.sqrt(xarg + bee)
         #return 0 * np.exp(-aee * xarg) / np.sqrt(xarg + bee)
+
+    def xi(self):
+        return np.linspace(self.a, self.b, self.ndvr)
+
+    def hij(self, R):
+        # generate hcore using Colbert-Miller syle DVR for kinetic energy
+        h = dvr_T(1, self.a, self.b, self.N, self.bounds) + np.diag(self.VeR(self.xi(), R))
+        #if self.eta != 0.0:
+        #    h += dvr_Wold(self.a, self.b, self.N, self.acap, self.bcap, self.eta, self.ncap, self.bounds)
+        return h
+
+    def dhij(self, R):
+        # generate derivative of hcore with respect to R using Colbert-Miller syle DVR for kinetic energy
+        dh = np.diag(self.dVeR(self.xi(), R))
+        return dh
+
+    def solve_mos(self, R):
+        self.ep[:], self.cip = eigh(self.hij(R))
+        #if self.eta == 0.0:
+        #    self.ep[:], self.cip = eigh(self.hij(R))
+        #else:
+        #    e, c = eig(self.hij(R))
+        #    idx = np.argsort(e.real)
+        #    self.ep, self.cip = e[idx], c[:,idx]
+        np.savez('mospec', ep=self.ep, xi=self.xi(), cip=self.cip)
 
     def Vik(self):
         # generate hcore using Colbert-Miller syle DVR for kinetic energy
@@ -95,19 +123,26 @@ class TESD(Model):
         Hikjl = self.Hikjl(R)
         match self.spin:
             case "singlet":
-                Hikjl *= (1 - (1 - 1/np.sqrt(2)) * dij[:,:,None,None]) * (1 - (1 - 1/np.sqrt(2)) * dij[None,None,:,:])
-                H = Hikjl[self.map_ij[:,None],self.map_kl[:,None],self.map_ij[None,:],self.map_kl[None,:]] + Hikjl[self.map_ij[:,None],self.map_kl[:,None],self.map_kl[None,:],self.map_ij[None,:]]
+                Hikjl *= (1 - (1 - 1 / np.sqrt(2)) * dij[:,:,None,None]) * (1 - (1 - 1 / np.sqrt(2)) * dij[None,None,:,:])
+                H += Hikjl[self.map_ij[:,None], self.map_kl[:,None], self.map_ij[None,:], self.map_kl[None,:]]
+                H += Hikjl[self.map_ij[:,None], self.map_kl[:,None], self.map_kl[None,:], self.map_ij[None,:]]
             case "triplet":
-                H = Hikjl[self.map_ij[:,None],self.map_kl[:,None],self.map_ij[None,:],self.map_kl[None,:]] - Hikjl[self.map_ij[:,None],self.map_kl[:,None],self.map_kl[None,:],self.map_ij[None,:]]
+                H += Hikjl[self.map_ij[:,None], self.map_kl[:,None], self.map_ij[None,:], self.map_kl[None,:]]
+                H -= Hikjl[self.map_ij[:,None], self.map_kl[:,None], self.map_kl[None,:], self.map_ij[None,:]]
         return H
 
     def solve_wfn(self, R):
-        if self.eta == 0.0:
-            self.En[:], self.Cijn[self.map_ij, self.map_kl, :] = np.linalg.eigh(self.Hdvr(R))
+        if self.nbo == self.nfci:
+             self.En[:], self.Cijn[self.map_ij, self.map_kl, :] = eigh(self.Hdvr(R))
         else:
-            E, C = np.linalg.eig(self.Hdvr(R))
-            idx = np.argsort(E.real)
-            self.En, self.Cijn[self.map_ij, self.map_kl, :] = E[idx], C[:,idx]
+             self.En[:], self.Cijn[self.map_ij, self.map_kl, :] = eigsh(self.Hdvr(R), k=self.nbo, which='SA')
+        #if self.eta == 0.0:
+        #    #self.En[:], self.Cijn[self.map_ij, self.map_kl, :] = np.linalg.eigh(self.Hdvr(R))
+        #    self.En[:], self.Cijn[self.map_ij, self.map_kl, :] = eigh(self.Hdvr(R))
+        #else:
+        #    E, C = eig(self.Hdvr(R))
+        #    idx = np.argsort(E.real)
+        #    self.En, self.Cijn[self.map_ij, self.map_kl, :] = E[idx], C[:,idx]
         match self.spin:
             case "singlet":
                 self.Cijn += self.Cijn.swapaxes(0,1)
@@ -116,18 +151,48 @@ class TESD(Model):
             case "triplet":
                 self.Cijn += -self.Cijn.swapaxes(0,1)
                 self.Cijn *= 1 / np.sqrt(2)
+        np.savez('eigspec', En=self.En, xi=self.xi(), Cijn=self.Cijn)
+
+    def dHikjl(self, R):
+        dHikjl = np.zeros((self.ndvr, self.ndvr, self.ndvr, self.ndvr), dtype=np.complex128)
+        dij = np.eye(self.ndvr)
+        dhij = self.dhij(R)
+        dHikjl += dhij[:,None,:,None] * dij[None,:,None,:]
+        dHikjl += dij[:,None,:,None] * dhij[None,:,None,:]
+        return dHikjl
+
+    def xikjl(self, n=1):
+        xikjl = np.zeros((self.ndvr, self.ndvr, self.ndvr, self.ndvr), dtype=np.complex128)
+        dij = np.eye(self.ndvr)
+        xij = dvr_xn(n, self.a, self.b, self.N, self.bounds)
+        xikjl += xij[:,None,:,None] * dij[None,:,None,:]
+        xikjl += dij[:,None,:,None] * xij[None,:,None,:]
+        return xikjl
+
+    def Wikjl(self, acap, bcap, ncap=2):
+        Wikjl = np.zeros((self.ndvr, self.ndvr, self.ndvr, self.ndvr), dtype=np.complex128)
+        dij = np.eye(self.ndvr)
+        wij = dvr_W(self.a, self.b, self.N, acap, bcap, ncap, self.bounds)
+        Wikjl += wij[:,None,:,None] * dij[None,:,None,:]
+        Wikjl += dij[:,None,:,None] * wij[None,:,None,:]
+        return Wikjl
+
+#    def Wnm(self, nbo=None):
+#        Wikjl = np.zeros((self.ndvr, self.ndvr, self.ndvr, self.ndvr), dtype=np.complex128)
+#        dij = np.eye(self.ndvr)
+#        wij = dvr_W(self.a, self.b, self.N, self.acap, self.bcap, self.ncap, self.bounds)
+#        Wikjl += wij[:,None,:,None] * dij[None,:,None,:]
+#        Wikjl += dij[:,None,:,None] * wij[None,:,None,:]
+#        CNn = self.Cijn.reshape(self.ndvr**2, self.nfci)[:,:nbo]
+#        WNM = Wikjl.reshape(self.ndvr**2, self.ndvr**2)
+#        Wnm = np.linalg.multi_dot([CNn.T.conj(), WNM, CNn])
+#        return Wnm 
 
 #    def wij(self):
 #        # generate complex absorbing potential using Colbert-Miller syle DVR
 #        return dvr_W(self.a, self.b, self.N, self.acap, self.bcap, self.eta, self.ncap, self.bounds)
 #
-#    def Wikjl(self):
-#        Wikjl = np.zeros((self.ndvr, self.ndvr, self.ndvr, self.ndvr), dtype=np.complex128)
-#        dij = np.eye(self.ndvr)
-#        wij = self.wij()
-#        Wikjl += wij[:,None,:,None] * dij[None,:,None,:]
-#        Wikjl += dij[:,None,:,None] * wij[None,:,None,:]
-#        return Wikjl
+
 #
 #    def Wdvr(self):
 #        W = np.zeros((self.nfci, self.nfci), dtype=np.complex128)

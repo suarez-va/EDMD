@@ -3,12 +3,20 @@ import os
 import numpy as np
 from abc import ABC, abstractmethod
 
-sys.path.append(os.path.abspath("../src"))
+#sys.path.append(os.path.abspath("../src"))
 from grid_utils.colbert_miller_dvr import dvr_xn, dvr_T, dvr_W
+
+def dvr_to_bo(Cijn, Oikjl, nbo=None):
+    ndvr = Cijn.shape[0]
+    nfci = Cijn.shape[-1]
+    CNn = Cijn.reshape(ndvr**2, nfci)[:,:nbo]
+    ONM = Oikjl.reshape(ndvr**2, ndvr**2)
+    Onm = np.linalg.multi_dot([CNn.T.conj(), ONM, CNn])
+    return Onm
 
 def calculate_nac(E, dHele_adi):
     nstates = E.shape[0]
-    nac = np.zeros((nstates, nstates), dtype=complex)
+    nac = np.zeros((nstates, nstates), dtype=np.complex128)
     for i in range(nstates):
         for j in range(nstates):
             if i == j:
