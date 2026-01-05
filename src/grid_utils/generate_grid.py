@@ -97,7 +97,8 @@ def sort_eta_data():
         #ovlp = np.absolute(np.tensordot(Cijn_prev, Cijn_curr, axes=([0,1],[0,1])))
         #ovlp = np.matmul(Cnm_prev.conj().T, Cnm_curr)
         ovlp = np.matmul(Clnm_prev.conj().T, Crnm_curr)
-        idx = np.argmax(np.absolute(ovlp), axis=1)
+        #idx = np.argmax(np.absolute(ovlp), axis=1)
+        idx = fix_index_array(np.argmax(np.absolute(ovlp), axis=1))[0]
         Er_sort = Er_curr[idx]
         Gam_sort = Gam_curr[idx]
         Clnm_sort = Clnm_curr[:,idx]
@@ -113,6 +114,39 @@ def sort_eta_data():
             print(vals[counts > 1])
 
     return None
+
+def fix_index_array(arr):
+    """
+    AI Generated:
+    Fix an integer array so that each value in the range [0, max(arr)]
+    appears exactly once. Later duplicates are replaced by the lowest missing elements.
+
+    Parameters 
+    ---------- 
+    arr : np.ndarray
+        1D array of integers representing index mappings.
+    
+    Returns
+    -------
+    arr_fixed : np.ndarray
+        Array with duplicates replaced by missing elements.
+    missing : np.ndarray
+        The missing elements that were used to fix duplicates.
+    duplicate_values : np.ndarray
+        Values that had duplicates in the original array.
+    """
+    arr = np.asarray(arr)
+    expected = np.arange(arr.max() + 1)
+    missing = np.setdiff1d(expected, arr)
+    unique_vals, first_idx, counts = np.unique(arr, return_index=True, return_counts=True)
+    duplicate_values = unique_vals[counts > 1]
+    mask_later_duplicates = np.zeros(len(arr), dtype=bool)
+    for val in duplicate_values:
+        indices = np.where(arr == val)[0]
+        mask_later_duplicates[indices[1:]] = True
+    arr_fixed = arr.copy()
+    arr_fixed[mask_later_duplicates] = missing
+    return arr_fixed, missing, duplicate_values
 
 
 def get_eta_data(idx):

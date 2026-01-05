@@ -1,54 +1,31 @@
 import numpy as np
-from models.two_electron_gaussian_diatomic import TEGD, TESD
+from models.two_electron_screened_diatomic import TESD
 import matplotlib.pyplot as plt
 
-#paramsSD = {
-#    "ZA": 1,
-#    "ZB": 1,
-#    "aee": 0.02,
-#    "bee": 0.25,
-#    "aR": 0.01205,
-#    "bR": 0.01,
-#    "aAe": 0.0102,
-#    "bAe": 0.655,
-#    "aBe": 0.0139,
-#    "bBe": 0.473,
-#    "mA": 36443.98900696,
-#    "mB": 7294.29954142,
-#}
-
-paramsSD = {
-    "ZA": 2,
-    "ZB": 1,
-    "mA": 7294.0,
-    "mB": 1836.0,
-    "aR": 0.01205,
-    "bR": 0.01,
-    "aAe": 0.002,
-    "bAe": 1.0,
-    "aBe": 0.002,
-    "bBe": 1.0,
+params = {
     "aee": 0.02,
     "bee": 0.25,
-}
-
-paramsGD = {
     "aR": 0.01205,
     "bR": 0.01,
-    "DA" : 1.0,
-    "bA": 0.25,
-    "DB" : 0.8,
-    "bB": 1.0,
-    "aee": 0.1,
-    "bee": 100.0,
+    "aAe": 0.0102,
+    "bAe": 0.655,
+    "aBe": 0.0139,
+    "bBe": 0.473,
+    "mA": 36443.98900696,
+    "mB": 7294.29954142,
+    "xmax": 40.0,
+    "ndvr": 500,
+    "spin": "singlet",
+    "nbo": 250
 }
-
-model = TESD(a=-100.0, b=100.0, N=1500, bounds="(-inf,inf)", spin="triplet",model_params=paramsSD)
-#model = TEGD(a=-100.0, b=100.0, N=1500, bounds="(-inf,inf)", spin="triplet",model_params=paramsGD)
+params["aAe"] = 0.10 #0.25
+params["aBe"] = 0.50 #1.00
+params["bAe"] = 1.00
+params["bBe"] = 1.5625
 
 R = 8.0
-ep, cip = model.solve_mos(R)
-print(np.round(ep[:5], decimals=5))
+model = TESD(params)
+model.solve_mos(R)
 
 plt.rcParams.update({
     'figure.figsize': (4.0, 3.0),
@@ -73,20 +50,23 @@ plt.rcParams.update({
     'legend.frameon': False,
 })
 
-nsta = 5
+
+npts = 10
 nscale = 2.2
 xi = model.xi()
 Vi = model.VeR(xi, R)
+ep = model.ep.real
+cip = model.cip
 plt.figure()
 plt.title(f"hcore spectra; R = {R} a.u.")
 plt.xlabel("x (a.u.)")
 plt.ylabel("V(x;R) (a.u.)")
 plt.plot(xi, Vi, color='k', linewidth='2')
-for i in range(nsta):
-    plt.plot(xi, nscale * np.absolute(cip[:,i])**2 + ep[i])
+for i in range(npts):
+    plt.plot(xi, nscale * np.absolute(cip[:,i])**2 + ep[i], linewidth='1')
     plt.axhline(y=ep[i], color='k', linewidth='1', linestyle='--')
-plt.xlim([-17.0,17.0])
-#plt.ylim([-2.75,0.25])
+plt.xlim([-12.0,12.0])
+#plt.ylim([-0.1,0.0])
 #plt.subplots_adjust(hspace=0.05, left=0.23, right=0.98, top=0.98, bottom=0.12)
 plt.subplots_adjust(hspace=0.05, left=0.23, right=0.95, top=0.90, bottom=0.20)
 plt.savefig("mospec.png")
