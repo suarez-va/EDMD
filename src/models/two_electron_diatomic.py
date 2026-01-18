@@ -1,8 +1,4 @@
 import numpy as np
-from scipy.linalg import eigh
-from scipy.sparse.linalg import eigsh
-
-from grid_utils.colbert_miller_dvr import dvr_xn, dvr_T, dvr_W
 from models.model_utils import Model
 
 class TEGD(Model):
@@ -14,10 +10,18 @@ class TEGD(Model):
         bR = self.params["bR"]
         return np.exp(-aR * R**2) / np.sqrt(R**2 + bR)
 
-    def dVR(self, R: float):
+    def d1VR(self, R: float):
         aR = self.params["aR"]
         bR = self.params["bR"]
-        return -(2 * aR + 1 / (R**2 + bR)) * R * np.exp(-aR * R**2) / np.sqrt(R**2 + bR)
+        GR = -R * (2 * aR + 1 / (R**2 + bR))
+        return GR * self.VR(R)
+
+    def d2VR(self, R: float):
+        aR = self.params["aR"]
+        bR = self.params["bR"]
+        GR = -R * (2 * aR + 1 / (R**2 + bR))
+        dGR = -(2 * aR + 1 / (R**2 + bR)) + 2 * R**2 / ((R**2 + bR)**2)
+        return (dGR + GR**2) * self.VR(R)
 
     def VeR(self, x, R: float):
         DAe = self.params["DA"]
@@ -27,7 +31,7 @@ class TEGD(Model):
         Aarg = (x + R / 2); Barg = (x - R / 2)
         return -DAe * np.exp(-bAe * Aarg**2) - DBe * np.exp(-bBe * Barg**2)
 
-    def dVeR(self, x, R: float):
+    def d1VeR(self, x, R: float):
         DAe = self.params["DA"]
         bAe = self.params["bA"]
         DBe = self.params["DB"]
@@ -35,13 +39,19 @@ class TEGD(Model):
         Aarg = (x + R / 2); Barg = (x - R / 2)
         return DAe * bAe * Aarg * np.exp(-bAe * Aarg**2) - DBe * bBe * Barg * np.exp(-bBe * Barg**2)
 
+    def d2VeR(self, x, R: float):
+        DAe = self.params["DA"]
+        bAe = self.params["bA"]
+        DBe = self.params["DB"]
+        bBe = self.params["bB"]
+        Aarg = (x + R / 2); Barg = (x - R / 2)
+        return 0.5 * (DAe * bAe * (1 - bAe * Aarg**2) * np.exp(-bAe * Aarg**2) + DBe * bBe * (1 - bBe * Barg**2) * np.exp(-bBe * Barg**2))
+
     def Vee(self, x1, x2):
         aee = self.params["aee"]
         bee = self.params["bee"]
-        xarg = np.absolute(x1 - x2)
-        #return 1 / np.sqrt(xarg**2 + aee**2 * np.exp(-bee * xarg))
-        return 1 / np.sqrt(xarg**2 + aee**4)
-        #return 0 / np.sqrt(xarg**2 + aee**2 * np.exp(-bee * xarg))
+        xarg = (x1 - x2)**2
+        return np.exp(-aee * xarg) / np.sqrt(xarg + bee)
 
 
 class TESD(Model):
