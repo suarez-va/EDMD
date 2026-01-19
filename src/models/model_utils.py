@@ -1,17 +1,16 @@
 import numpy as np
 from scipy.linalg import eigh, eig
-from scipy.sparse.linalg import eigsh
+from scipy.sparse.linalg import eigsh, LinearOperator
 from grids.colbert_miller_dvr import dvr_x, dvr_T, dvr_W
 
 from abc import ABC, abstractmethod
 
-def dvr_to_bo(Cijn, Oikjl):
-    ndvr = Cijn.shape[0]
-    nbo = Cijn.shape[-1]
-    CNn = Cijn.reshape(ndvr**2, nbo)
-    ONM = Oikjl.reshape(ndvr**2, ndvr**2)
-    Onm = np.linalg.multi_dot([CNn.conj().T, ONM, CNn])
-    return Onm
+def matmat(operator, vectors):
+    k = vectors.shape[1]
+    out = np.zeros_like(vectors, dtype=np.complex128)
+    for j in range(k):
+        out[:, j] = operator.matvec(vectors[:, j])
+    return out
 
 def solve_nac1(En, d1Hnm):
     nbo = En.shape[0]
@@ -42,6 +41,14 @@ def solve_cap(Hnm, Wnm, eta):
     Cnml *= 1 / norm; Cnmr *= 1 / norm.conj()
     np.savez('capspec', En=En, Cnml=Cnml, Cnmr=Cnmr)
     return En, Cnml, Cnmr
+
+def dvr_to_bo(Cijn, Oikjl):
+    ndvr = Cijn.shape[0]
+    nbo = Cijn.shape[-1]
+    CNn = Cijn.reshape(ndvr**2, nbo)
+    ONM = Oikjl.reshape(ndvr**2, ndvr**2)
+    Onm = np.linalg.multi_dot([CNn.conj().T, ONM, CNn])
+    return Onm
 
 class Model(ABC):
     def __init__(self, a: float, b: float, N: int, bounds: str, spin: str, model_params: dict):
@@ -103,14 +110,118 @@ class Model(ABC):
         xi=self.xi()
         return np.diag(self.d2VeR(xi, R))
 
+    def Vik(self) -> np.ndarray:
+        xi=self.xi()
+        return self.Vee(xi[:,None],xi[None,:])
+
     def solve_mos(self, R: float):
         ep, cip = eigh(self.hij(R))
         np.savez('mospec', xi=self.xi(), ep=ep, cip=cip)
         return ep, cip
 
-    def Vik(self) -> np.ndarray:
-        xi=self.xi()
-        return self.Vee(xi[:,None],xi[None,:])
+    def H(self, R: float):
+        dij = np.eye(self.ndvr)
+        nij = (1 - (1 - 1 / np.sqrt(2)) * dij)
+        hij = self.hij(R)
+        Vik = self.Vik()
+        match self.spin:
+            case "singlet":
+                def matvec(C):
+                    Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
+                    Cjl[self.map_ij, self.map_kl] = C; Cjl *= nij; Cjl += Cjl.T
+                    Cik = nij * (np.matmul(hij, Cjl) + np.matmul(Cjl, hij.conj().T) + Vik * Cjl)
+                    return Cik[self.map_ij, self.map_kl]
+            case "triplet":
+                def matvec(C):
+                    Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
+                    Cjl[self.map_ij, self.map_kl] = C; Cjl -= Cjl.T
+                    Cik = (np.matmul(hij, Cjl) + np.matmul(Cjl, hij.conj().T) + Vik * Cjl)
+                    return Cik[self.map_ij, self.map_kl]
+        return LinearOperator(shape=(self.nfci, self.nfci), matvec=matvec, dtype=np.complex128)
+
+    def d1H(self, R: float):
+        dij = np.eye(self.ndvr)
+        nij = (1 - (1 - 1 / np.sqrt(2)) * dij)
+        d1hij = self.d1hij(R)
+        match self.spin:
+            case "singlet":
+                def matvec(C):
+                    Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
+                    Cjl[self.map_ij, self.map_kl] = C; Cjl *= nij; Cjl += Cjl.T
+                    Cik = nij * (np.matmul(d1hij, Cjl) + np.matmul(Cjl, d1hij.conj().T))
+                    return Cik[self.map_ij, self.map_kl]
+            case "triplet":
+                def matvec(C):
+                    Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
+                    Cjl[self.map_ij, self.map_kl] = C; Cjl -= Cjl.T
+                    Cik = (np.matmul(d1hij, Cjl) + np.matmul(Cjl, d1hij.conj().T))
+                    return Cik[self.map_ij, self.map_kl]
+        return LinearOperator(shape=(self.nfci, self.nfci), matvec=matvec, dtype=np.complex128)
+
+    def d2H(self, R: float):
+        dij = np.eye(self.ndvr)
+        nij = (1 - (1 - 1 / np.sqrt(2)) * dij)
+        d2hij = self.d2hij(R)
+        match self.spin:
+            case "singlet":
+                def matvec(C):
+                    Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
+                    Cjl[self.map_ij, self.map_kl] = C; Cjl *= nij; Cjl += Cjl.T
+                    Cik = nij * (np.matmul(d2hij, Cjl) + np.matmul(Cjl, d2hij.conj().T))
+                    return Cik[self.map_ij, self.map_kl]
+            case "triplet":
+                def matvec(C):
+                    Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
+                    Cjl[self.map_ij, self.map_kl] = C; Cjl -= Cjl.T
+                    Cik = (np.matmul(d2hij, Cjl) + np.matmul(Cjl, d2hij.conj().T))
+                    return Cik[self.map_ij, self.map_kl]
+        return LinearOperator(shape=(self.nfci, self.nfci), matvec=matvec, dtype=np.complex128)
+
+    def solve_wfn(self, R: float, nbo: int = 100):
+        En, CIn = eigsh(self.H(R), k=nbo, which='SA')
+        idx = np.argsort(En)
+        En = En[idx]; CIn = CIn[:,idx]
+
+        d1Hnm = np.matmul(CIn.conj().T, matmat(self.d1H(R), CIn))
+        d1En = np.diag(d1Hnm.real)
+        nac1 = solve_nac1(En, d1Hnm)
+        d2Hnm = np.matmul(CIn.conj().T, matmat(self.d2H(R), CIn))
+        d2En = solve_d2En(En, d1Hnm, d2Hnm)
+
+        Cijn = np.zeros((self.ndvr, self.ndvr, nbo), dtype=np.complex128)
+        Cijn[self.map_ij, self.map_kl, :] = CIn 
+        match self.spin:
+            case "singlet":
+                dij = np.eye(self.ndvr)
+                nij = (1 - (1 - 1 / np.sqrt(2)) * dij)
+                Cijn *= nij[:,:,None]
+                Cijn += Cijn.swapaxes(0,1)
+                Cijn *= 1 / np.sqrt(2)
+            case "triplet":
+                Cijn += -Cijn.swapaxes(0,1)
+                Cijn *= 1 / np.sqrt(2)
+        np.savez('eigspec', xi=self.xi(), En=En, Cijn=Cijn, d1En=d1En, d1Hnm=d1Hnm, nac1=nac1, d2En=d2En, d2Hnm=d2Hnm)
+        return CIn
+
+    def W(self, acap: float, bcap: float, ncap: int = 2):
+        dij = np.eye(self.ndvr)
+        nij = (1 - (1 - 1 / np.sqrt(2)) * dij)
+        wij = dvr_W(self.a, self.b, self.N, acap, bcap, ncap, self.bounds)
+        match self.spin:
+            case "singlet":
+                def matvec(C):
+                    Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
+                    Cjl[self.map_ij, self.map_kl] = C; Cjl *= nij; Cjl += Cjl.T
+                    Cik = nij * (np.matmul(wij, Cjl) + np.matmul(Cjl, wij.conj().T))
+                    return Cik[self.map_ij, self.map_kl]
+            case "triplet":
+                def matvec(C):
+                    Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
+                    Cjl[self.map_ij, self.map_kl] = C; Cjl -= Cjl.T
+                    Cik = (np.matmul(wij, Cjl) + np.matmul(Cjl, wij.conj().T))
+                    return Cik[self.map_ij, self.map_kl]
+        return LinearOperator(shape=(self.nfci, self.nfci), matvec=matvec, dtype=np.complex128)
+
 
     def Hikjl(self, R: float) -> np.ndarray:
         Hikjl = np.zeros((self.ndvr, self.ndvr, self.ndvr, self.ndvr), dtype=np.complex128)
@@ -133,7 +244,7 @@ class Model(ABC):
     def d2Hikjl(self, R: float) -> np.ndarray:
         d2Hikjl = np.zeros((self.ndvr, self.ndvr, self.ndvr, self.ndvr), dtype=np.complex128)
         dij = np.eye(self.ndvr)
-        d2hij = self.d1hij(R)
+        d2hij = self.d2hij(R)
         d2Hikjl += d2hij[:,None,:,None] * dij[None,:,None,:]
         d2Hikjl += dij[:,None,:,None] * d2hij[None,:,None,:]
         return d2Hikjl
@@ -152,7 +263,24 @@ class Model(ABC):
                 H -= Hikjl[self.map_ij[:,None], self.map_kl[:,None], self.map_kl[None,:], self.map_ij[None,:]]
         return H
 
-    def solve_wfn(self, R: float, nbo: int = 0):
+#    def Hdvr_operator(self, R: float):
+#        dij = np.eye(self.ndvr)
+#        hij = self.hij(R)
+#        Vik = self.Vik()
+#        def matvec(CJ):
+#            Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
+#            Cjl[self.map_ij, self.map_kl] = CJ
+#            Cjl[self.map_kl, self.map_ij] = -CJ
+#            #Cjl += -Cjl.swapaxes(0,1); Cjl *= 1 / np.sqrt(2)
+#            #Cjl *= (1 - (1 - 1 / np.sqrt(2)) * dij)
+#            #Cik = (1 - (1 - 1 / np.sqrt(2)) * dij) * (np.matmul(hij, Cjl) + np.matmul(Cjl, hij.conj().T) + Vik * Cjl)
+#            Cik = (np.matmul(hij, Cjl) + np.matmul(Cjl, hij.conj().T) + Vik * Cjl)
+#            #Cik = (hij @ Cjl + Cjl @ hij + Vik * Cjl)
+#            CI = Cik[self.map_ij, self.map_kl]
+#            return CI
+#        return LinearOperator(shape=(self.nfci, self.nfci), matvec=matvec, dtype=np.complex128)
+
+    def solve_wfn_dense(self, R: float, nbo: int = 0):
         if nbo == 0 or nbo == self.nfci:
              Cijn = np.zeros((self.ndvr, self.ndvr, self.nfci), dtype=np.complex128)
              En, Cijn[self.map_ij, self.map_kl, :] = eigh(self.Hdvr(R))
@@ -172,9 +300,9 @@ class Model(ABC):
         d1Hnm = dvr_to_bo(Cijn, self.d1Hikjl(R))
         d1En = np.diag(d1Hnm.real)
         nac1 = solve_nac1(En, d1Hnm)
-        d2Hnm = dvr_to_bo(Cijn, self.d1Hikjl(R))
+        d2Hnm = dvr_to_bo(Cijn, self.d2Hikjl(R))
         d2En = solve_d2En(En, d1Hnm, d2Hnm)
-        np.savez('eigspec', xi=self.xi(), En=En, Cijn=Cijn, d1En=d1En, d1Hnm=d1Hnm, nac1=nac1, d2En=d2En, d2Hnm=d2Hnm)
+        np.savez('eigspec0', xi=self.xi(), En=En, Cijn=Cijn, d1En=d1En, d1Hnm=d1Hnm, nac1=nac1, d2En=d2En, d2Hnm=d2Hnm)
         return En, Cijn
 
     def solve_wfn_oldish(self, R: float, nbo: int = 0, grad: int = 2):

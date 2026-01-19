@@ -17,13 +17,15 @@ params = {
 R = 20.0
 
 nsta = 100
-Npts = 25
-N_ar = nsta + 10 * np.arange(Npts)
-print(N_ar[0])
+#Npts = 41
+#N_ar = nsta + 10 * np.arange(Npts)
+Npts = 400
+N_ar = np.arange(Npts)+101
+print(N_ar[-1])
 ep_ar = np.zeros((Npts,nsta))
 
 for i, N in enumerate(N_ar):
-    model = TEGD(a=-100.0, b=100.0, N=N, bounds="(-inf,inf)", spin="triplet", model_params=params)
+    model = TEGD(a=-200.0, b=200.0, N=N, bounds="(-inf,inf)", spin="triplet", model_params=params)
     ep, cip = model.solve_mos(R)
     ep_ar[i,:] = ep[:nsta]
 
@@ -51,7 +53,7 @@ plt.rcParams.update({
 })
 
 plt.figure()
-plt.title(f"hcore stabilization; (a,b)=(-100,100), R = {R} a.u.")
+plt.title(f"hcore stabilization; (a,b)=(-200,200), R = {R} a.u.")
 plt.xlabel("N points")
 plt.ylabel("ep (a.u.)")
 for i in range(nsta):
@@ -62,3 +64,4 @@ for i in range(nsta):
 #plt.subplots_adjust(hspace=0.05, left=0.23, right=0.95, top=0.90, bottom=0.20)
 plt.savefig("stabilization.png")
 
+print(ep_ar[-1,0])
