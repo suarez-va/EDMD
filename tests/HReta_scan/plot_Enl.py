@@ -6,10 +6,12 @@ from matplotlib.animation import FuncAnimation
 if not os.path.exists("etal"):
     print("Missing grid data directory etal")
     exit()
-eigspec = np.load("eigspec.npz")
+#eigspec = np.load("eigspec.npz")
+capspec = np.load("etal/eta0/capspec.npz")
 etal = np.loadtxt("etal/etal.dat", dtype=np.float64)
 
-nbo = eigspec["En"].shape[0]
+#nbo = eigspec["En"].shape[0]
+nbo = capspec["En"].shape[0]
 lpts = etal.shape[0]
 Enl = np.zeros((nbo,lpts), dtype=np.complex128)
 for l, eta in enumerate(etal):
