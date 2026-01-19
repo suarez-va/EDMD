@@ -13,17 +13,14 @@ params = {
     "bee": 0.0001,
 }
 
-model = TEGD(a=-100.0, b=100.0, N=250, bounds="(-inf,inf)", spin="triplet", model_params=params)
+model = TEGD(a=-150.0, b=150.0, N=325, bounds="(-inf,inf)", spin="triplet", model_params=params)
 
-En, Cijn = model.solve_wfn(R = R_sub, nbo = 250)
+En, Cijn = model.solve_wfn(R = R_sub, nbo = 100)
 
 Wab20n2 = dvr_to_bo(Cijn, model.Wikjl(acap=-20.0, bcap=20.0, ncap=2))
 Wab40n2 = dvr_to_bo(Cijn, model.Wikjl(acap=-40.0, bcap=40.0, ncap=2))
+Wab50n2 = dvr_to_bo(Cijn, model.Wikjl(acap=-50.0, bcap=50.0, ncap=2))
 Wab60n2 = dvr_to_bo(Cijn, model.Wikjl(acap=-60.0, bcap=60.0, ncap=2))
 Wab80n2 = dvr_to_bo(Cijn, model.Wikjl(acap=-80.0, bcap=80.0, ncap=2))
-Wab20n4 = dvr_to_bo(Cijn, model.Wikjl(acap=-20.0, bcap=20.0, ncap=4))
-Wab40n4 = dvr_to_bo(Cijn, model.Wikjl(acap=-40.0, bcap=40.0, ncap=4))
-Wab60n4 = dvr_to_bo(Cijn, model.Wikjl(acap=-60.0, bcap=60.0, ncap=4))
-Wab80n4 = dvr_to_bo(Cijn, model.Wikjl(acap=-80.0, bcap=80.0, ncap=4))
-np.savez("boops", Wab20n2=Wab20n2, Wab40n2=Wab40n2, Wab60n2=Wab60n2, Wab80n2=Wab80n2, Wab20n4=Wab20n4, Wab40n4=Wab40n4, Wab60n4=Wab60n4, Wab80n4=Wab80n4)
+np.savez("boops", Wab20n2=Wab20n2, Wab40n2=Wab40n2, Wab50n2=Wab50n2, Wab60n2=Wab60n2, Wab80n2=Wab80n2)
 

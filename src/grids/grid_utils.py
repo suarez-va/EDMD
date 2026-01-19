@@ -55,6 +55,7 @@ def sort_R_grid():
         np.savez("Rk/R0/boops2", **boops)
 
     for k, R in enumerate(Rk[1:], start=1):
+        print(k)
         sub_dir_prev = f"Rk/R{k-1}"
         sub_dir_curr = f"Rk/R{k}"
         eigspec_prev = np.load(sub_dir_prev + "/eigspec2.npz")

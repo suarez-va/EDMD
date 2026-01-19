@@ -11,10 +11,10 @@ for dir in R*; do
       cd ..
       continue
     fi
-    sbatch ../../submit_solve_R_grid.slm
+    core=$((RANDOM % 14)) # random integer: 0–13
+    taskset -c "$core" python template_R.py
     cd ../
   fi
 done
 
 cd ../
-
