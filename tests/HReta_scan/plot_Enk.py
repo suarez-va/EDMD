@@ -6,7 +6,7 @@ from matplotlib.animation import FuncAnimation
 if not os.path.exists("Rk"):
     print("Missing grid data directory Rk")
     exit()
-eigspec_0 = np.load("Rk/R0/eigspec2.npz")
+eigspec_0 = np.load("Rk/R0/eigspec.npz")
 Rk = np.loadtxt("Rk/Rk.dat", dtype=np.float64)
 
 nbo = eigspec_0["En"].shape[0]
@@ -14,7 +14,7 @@ kpts = Rk.shape[0]
 Enk = np.zeros((nbo,kpts), dtype=np.float64)
 for k, R in enumerate(Rk):
     sub_dir = f"Rk/R{k}"
-    eigspec = np.load(sub_dir + "/eigspec2.npz")
+    eigspec = np.load(sub_dir + "/eigspec.npz")
     Enk[:,k] = eigspec["En"]
 
 plt.rcParams.update({

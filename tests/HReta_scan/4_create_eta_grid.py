@@ -13,9 +13,14 @@ if not os.path.exists("Rk"):
     exit()
 kpts = int(os.popen("wc -l < Rk/Rk.dat").read().strip()) - 1
 
-for k in range(kpts + 1):
-    os.chdir(f"Rk/R{k}")
-    create_eta_grid(coef, delta, lpts, "../../template_eta.py")
-    os.chdir("../../")
+k=160
+os.chdir(f"Rk/R{k}")
+create_eta_grid(coef, delta, lpts, "../../template_eta.py")
+os.chdir("../../")
+
+#for k in range(kpts + 1):
+#    os.chdir(f"Rk/R{k}")
+#    create_eta_grid(coef, delta, lpts, "../../template_eta.py")
+#    os.chdir("../../")
 
 

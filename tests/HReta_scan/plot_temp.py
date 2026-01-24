@@ -6,7 +6,7 @@ from matplotlib.animation import FuncAnimation
 if not os.path.exists("Rk"):
     print("Missing grid data directory Rk")
     exit()
-eigspec_0 = np.load("Rk/R0/eigspec2.npz")
+eigspec_0 = np.load("Rk/R0/eigspec.npz")
 Rk = np.loadtxt("Rk/Rk.dat", dtype=np.float64)
 
 nbo = eigspec_0["En"].shape[0]
@@ -14,7 +14,7 @@ kpts = Rk.shape[0]
 Enk = np.zeros((nbo,kpts), dtype=np.float64)
 for k, R in enumerate(Rk):
     sub_dir = f"Rk/R{k}"
-    eigspec = np.load(sub_dir + "/eigspec2.npz")
+    eigspec = np.load(sub_dir + "/eigspec.npz")
     Enk[:,k] = eigspec["En"]
 
 plt.rcParams.update({
@@ -46,9 +46,9 @@ ax.set_ylim(-0.5, -0.325)
 ax.set_xlabel('R (a.u.)')
 ax.set_ylabel('E(R) (a.u.)')
 #ax.axvline(x=8.0, color='k', linestyle='--')
-for n in range(150):
-    if n==44:
-        ax.plot(Rk, Enk[44,:], color = 'k', linewidth=2)
+for n in range(250):
+    if n==233:
+        ax.plot(Rk, Enk[233,:], color = 'k', linewidth=2)
     else:
         ax.plot(Rk, Enk[n,:])
     #ax.plot(Rk, Enk[n,:] + 0.6936231602269626)
