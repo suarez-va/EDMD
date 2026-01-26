@@ -14,13 +14,13 @@ params = {
 }
 
 #model = TEGD(a=-196.7/2.0, b=196.7/2.0, N=500, bounds="(-inf,inf)", spin="singlet", model_params=params)
-model = TEGD(a=-250, b=250, N=750, bounds="(-inf,inf)", spin="singlet", model_params=params)
+model = TEGD(a=-196.7/2.0, b=196.7/2.0, N=250, bounds="(-inf,inf)", spin="singlet", model_params=params)
 
 ep, cip = model.solve_mos(R = 8.0)
+wab50n2 = model.wij(acap=-50.0, bcap=50.0, ncap=2)
+np.savez("moops", wab50n2=wab50n2)
 
-#exit()
-
-CIn = model.solve_wfn(R = 8.0, nbo = 250)
+CIn = model.solve_wfn(R = 8.0, nbo = 225)
 Wab50n2 = np.matmul(CIn.conj().T, matmat(model.W(acap=-50.0, bcap=50.0, ncap=2), CIn))
 np.savez("boops", Wab50n2=Wab50n2)
 

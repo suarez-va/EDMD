@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.linalg import eigh, eig
+from scipy.linalg import lu_factor, lu_solve
 from scipy.sparse.linalg import eigsh, LinearOperator
 from grids.colbert_miller_dvr import dvr_x, dvr_T, dvr_W
 
@@ -38,7 +39,8 @@ def solve_cap(Hnm, Wnm, eta):
     idx = np.argsort(En.real)
     En, Cnml, Cnmr = En[idx], Cnml[:,idx], Cnmr[:,idx]
     norm = np.sqrt(np.diag(np.matmul(Cnml.conj().T, Cnmr)))
-    Cnml *= 1 / norm; Cnmr *= 1 / norm.conj()
+    #Cnml *= 1 / norm; Cnmr *= 1 / norm.conj() YOU HAD THIS ONE FLIPPED FOR SOME TIME!!!
+    Cnml *= 1 / norm.conj(); Cnmr *= 1 / norm
     np.savez('capspec', En=En, Cnml=Cnml, Cnmr=Cnmr)
     return En, Cnml, Cnmr
 
@@ -115,9 +117,52 @@ class Model(ABC):
         return self.Vee(xi[:,None],xi[None,:])
 
     def solve_mos(self, R: float):
-        ep, cip = eigh(self.hij(R))
-        np.savez('mospec', xi=self.xi(), ep=ep, cip=cip)
+        hij = self.hij(R)
+        ep, cip = eigh(hij)
+        np.savez('mospec', xi=self.xi(), ep=ep, cip=cip, hij=hij)
         return ep, cip
+
+    def wfn_to_vec(self, Cijn):
+        assert (Cijn.shape[0] == self.ndvr) and (Cijn.shape[1] == self.ndvr), f"First two dimensions of wavefunction Cijn, must match dvr dimensionality: ({self.ndvr}, {self.ndvr})"
+        assert (Cijn.ndim == 2) or (Cijn.ndim == 3), f"Wavefunction Cijn should have either 2 or 3 dimensions"
+        if Cijn.ndim==2:
+            nbo = 0
+            Cijn = Cijn[:,:,None]
+            CIn = np.zeros((self.nfci, 1), dtype=np.complex128)
+        else:
+            nbo = Cijn.shape[2]
+            CIn = np.zeros((self.nfci, nbo), dtype=np.complex128)
+        match self.spin:
+            case "singlet":
+                dij = np.eye(self.ndvr)
+                nij = (1 - (1 - 1 / np.sqrt(2)) * dij)
+                CIn = nij[self.map_ij, self.map_kl, None] / np.sqrt(2) * (Cijn[self.map_ij, self.map_kl, :] + Cijn[self.map_kl, self.map_ij, :])
+            case "triplet":
+                CIn = 1 / np.sqrt(2) * (Cijn[self.map_ij, self.map_kl, :] - Cijn[self.map_kl, self.map_ij, :])
+        return CIn[:, 0] if (nbo==0) else CIn
+
+    def vec_to_wfn(self, CIn):
+        assert (CIn.shape[0] == self.nfci), f"First dimension of CI vector CIn, must match fci dimensionality: ({self.nfci})"
+        assert (CIn.ndim == 1) or (CIn.ndim == 2), f"CI vector CIn should have either 1 or 2 dimensions"
+        if CIn.ndim==1:
+            nbo = 0
+            CIn = CIn[:,None]
+            Cijn = np.zeros((self.ndvr, self.ndvr, 1), dtype=np.complex128)
+        else:
+            nbo = CIn.shape[1]
+            Cijn = np.zeros((self.ndvr, self.ndvr, nbo), dtype=np.complex128)
+        Cijn[self.map_ij, self.map_kl, :] = CIn
+        match self.spin:
+            case "singlet":
+                dij = np.eye(self.ndvr)
+                nij = (1 - (1 - 1 / np.sqrt(2)) * dij)
+                Cijn *= nij[:,:,None]
+                Cijn += Cijn.swapaxes(0,1)
+                Cijn *= 1 / np.sqrt(2)
+            case "triplet":
+                Cijn += -Cijn.swapaxes(0,1)
+                Cijn *= 1 / np.sqrt(2)
+        return Cijn[:, :, 0] if (nbo==0) else Cijn
 
     def H(self, R: float):
         dij = np.eye(self.ndvr)
@@ -129,7 +174,9 @@ class Model(ABC):
                 def matvec(C):
                     Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
                     Cjl[self.map_ij, self.map_kl] = C; Cjl *= nij; Cjl += Cjl.T
-                    Cik = nij * (np.matmul(hij, Cjl) + np.matmul(Cjl, hij.conj().T) + Vik * Cjl)
+                    hC = np.matmul(hij, Cjl)
+                    Cik = nij * (hC + hC.T + Vik * Cjl)
+                    #Cik = nij * (np.matmul(hij, Cjl) + np.matmul(Cjl, hij.conj().T) + Vik * Cjl)
                     return Cik[self.map_ij, self.map_kl]
             case "triplet":
                 def matvec(C):
@@ -189,7 +236,7 @@ class Model(ABC):
         d2En = solve_d2En(En, d1Hnm, d2Hnm)
 
         Cijn = np.zeros((self.ndvr, self.ndvr, nbo), dtype=np.complex128)
-        Cijn[self.map_ij, self.map_kl, :] = CIn 
+        Cijn[self.map_ij, self.map_kl, :] = CIn
         match self.spin:
             case "singlet":
                 dij = np.eye(self.ndvr)
@@ -203,10 +250,15 @@ class Model(ABC):
         np.savez('eigspec', xi=self.xi(), En=En, Cijn=Cijn, d1En=d1En, d1Hnm=d1Hnm, nac1=nac1, d2En=d2En, d2Hnm=d2Hnm)
         return CIn
 
+    # generate cap using Colbert-Miller syle DVR
+    def wij(self, acap: float, bcap: float, ncap: int = 2) -> np.ndarray:
+        return dvr_W(self.a, self.b, self.N, acap, bcap, ncap, self.bounds)
+
     def W(self, acap: float, bcap: float, ncap: int = 2):
         dij = np.eye(self.ndvr)
         nij = (1 - (1 - 1 / np.sqrt(2)) * dij)
-        wij = dvr_W(self.a, self.b, self.N, acap, bcap, ncap, self.bounds)
+        wij = self.wij(acap, bcap, ncap)
+        #wij = dvr_W(self.a, self.b, self.N, acap, bcap, ncap, self.bounds)
         match self.spin:
             case "singlet":
                 def matvec(C):
