@@ -13,18 +13,19 @@ params = {
     "bee": 0.0001,
 }
 
-#model = TEGD(a=-196.7/2.0, b=196.7/2.0, N=500, bounds="(-inf,inf)", spin="singlet", model_params=params)
-model = TEGD(a=-196.7/2.0, b=196.7/2.0, N=250, bounds="(-inf,inf)", spin="singlet", model_params=params)
+model = TEGD(a=-196.7/2.0, b=196.7/2.0, N=750, bounds="(-inf,inf)", spin="singlet", model_params=params)
 
-ep, cip = model.solve_mos(R = 8.0)
-wab50n2 = model.wij(acap=-50.0, bcap=50.0, ncap=2)
-np.savez("moops", wab50n2=wab50n2)
+R = 8.0
+acap = -50.0
+bcap = 50.0
+ncap = 2
 
-CIn = model.solve_wfn(R = 8.0, nbo = 225)
-Wab50n2 = np.matmul(CIn.conj().T, matmat(model.W(acap=-50.0, bcap=50.0, ncap=2), CIn))
-np.savez("boops", Wab50n2=Wab50n2)
+Cn = model.solve_bo(R = R, nbo = 225)
+Wnm = np.matmul(Cn.conj().T, matmat(model.W(acap = acap, bcap = bcap, ncap = ncap), Cn))
+np.savez("boops", Wnm=Wnm)
 
-exit()
-
-ep, cip = model.solve_mos(R = 8.0)
-
+cip = model.solve_mos(R = R)
+wij = model.wij(acap = acap, bcap = bcap, ncap = ncap)
+wk = np.diag(wij)
+wpq = np.matmul(cip.conj().T, np.matmul(wij, cip))
+np.savez("moops", wk = wk, wpq = wpq)

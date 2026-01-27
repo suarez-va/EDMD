@@ -2,29 +2,60 @@ import numpy as np
 from scipy.linalg import expm
 from models.model_utils import matmat, solve_cap
 from models.two_electron_diatomic import TEGD
+from edmd import EDMD
 import time
 
-nbo2=125
+params = {
+    "aR": 0.0,
+    "bR": 0.0001,
+    "DA" : 1.0,
+    "bA": 0.25,
+    "DB" : 0.8,
+    "bB": 1.0,
+    "aee": 0.0,
+    "bee": 0.0001,
+}
 
-#eta = 3e-04
-eta = 1e-04
-#eta =1e-10
-
+model = TEGD(a=-196.7/2.0, b=196.7/2.0, N=750, bounds="(-inf,inf)", spin="singlet", model_params=params)
 mospec = np.load('mospec.npz') 
 moops = np.load('moops.npz')
+bospec = np.load('bospec.npz')
+boops = np.load('boops.npz')
+
+eta = 1e-04
+nmo = 25
+nbo = 222
+ep = mospec['ep'][:nmo]
+cip = mospec['cip'][:,:nmo]
+wk = moops['wk']
+wpq = moops['wpq'][:nmo,:nmo]
+En = bospec['En'][:nbo]
+Cijn = bospec['Cijn'][:,:,:nbo]
+Wnm = boops['Wnm'][:nbo,:nbo]
+
+edmd = EDMD(model, eta, wk, ep, cip, wpq, En, Cijn, Wnm)
+
+ndvr = wk.shape[0]
+ci1 = cip[:,1]
+ci2 = cip[:,2]
+Cij0 = 1.0 / np.sqrt(2) * (ci1[:,None] * ci2[None,:] + ci2[:,None] * ci1[None,:])
+Cn0 = np.zeros((nbo), dtype=np.complex128)
+for n in range(nbo):
+    Cn0[n] = np.matmul(Cijn[:,:,n].reshape(ndvr**2).conj().T, Cij0.reshape(ndvr**2))
+
+edmd.kernel(Cn0, timestep = 0.1, nsteps = 100000, nprint = 10)
+
+exit()
 hij = mospec['hij']
 wij = moops["wab50n2"]
-eigspec = np.load('eigspec.npz')
-boops = np.load('boops.npz')
+
 Hnm = np.diag(eigspec['En'])[:nbo2,:nbo2]
 Wnm = boops["Wab50n2"][:nbo2,:nbo2]
 #Hnm = np.diag(eigspec['En'])
 #Wnm = boops["Wab50n2"]
 
-heta = hij - 1j * eta * wij
-Heta = Hnm - 1j * eta * Wnm
 
-wk = np.diag(wij)
+exit()
 
 ea, xial, xiar = solve_cap(hij, wij, eta)
 xia = xiar

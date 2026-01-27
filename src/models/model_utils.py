@@ -119,8 +119,10 @@ class Model(ABC):
     def solve_mos(self, R: float):
         hij = self.hij(R)
         ep, cip = eigh(hij)
-        np.savez('mospec', xi=self.xi(), ep=ep, cip=cip, hij=hij)
-        return ep, cip
+
+        hpq = np.matmul(cip.conj().T, np.matmul(hij, cip))
+        np.savez('mospec', xi=self.xi(), ep=ep, cip=cip, hpq=hpq)
+        return cip
 
     def wfn_to_vec(self, Cijn):
         assert (Cijn.shape[0] == self.ndvr) and (Cijn.shape[1] == self.ndvr), f"First two dimensions of wavefunction Cijn, must match dvr dimensionality: ({self.ndvr}, {self.ndvr})"
@@ -224,37 +226,47 @@ class Model(ABC):
                     return Cik[self.map_ij, self.map_kl]
         return LinearOperator(shape=(self.nfci, self.nfci), matvec=matvec, dtype=np.complex128)
 
-    def solve_wfn(self, R: float, nbo: int = 100):
-        En, CIn = eigsh(self.H(R), k=nbo, which='SA')
+    def solve_bo(self, R: float, nbo: int = 100):
+        En, Cn = eigsh(self.H(R), k=nbo, which='SA')
+        #En, Cn = eigsh(self.H(R), k=nbo, which='SA', ncv=~1.5*k, tol=1e-8)
         idx = np.argsort(En)
-        En = En[idx]; CIn = CIn[:,idx]
+        En = En[idx]; Cn = Cn[:,idx]
 
-        d1Hnm = np.matmul(CIn.conj().T, matmat(self.d1H(R), CIn))
+        d1Hnm = np.matmul(Cn.conj().T, matmat(self.d1H(R), Cn))
         d1En = np.diag(d1Hnm.real)
         nac1 = solve_nac1(En, d1Hnm)
-        d2Hnm = np.matmul(CIn.conj().T, matmat(self.d2H(R), CIn))
+        d2Hnm = np.matmul(Cn.conj().T, matmat(self.d2H(R), Cn))
         d2En = solve_d2En(En, d1Hnm, d2Hnm)
-
-        Cijn = np.zeros((self.ndvr, self.ndvr, nbo), dtype=np.complex128)
-        Cijn[self.map_ij, self.map_kl, :] = CIn
-        match self.spin:
-            case "singlet":
-                dij = np.eye(self.ndvr)
-                nij = (1 - (1 - 1 / np.sqrt(2)) * dij)
-                Cijn *= nij[:,:,None]
-                Cijn += Cijn.swapaxes(0,1)
-                Cijn *= 1 / np.sqrt(2)
-            case "triplet":
-                Cijn += -Cijn.swapaxes(0,1)
-                Cijn *= 1 / np.sqrt(2)
-        np.savez('eigspec', xi=self.xi(), En=En, Cijn=Cijn, d1En=d1En, d1Hnm=d1Hnm, nac1=nac1, d2En=d2En, d2Hnm=d2Hnm)
-        return CIn
+        Cijn = self.vec_to_wfn(Cn)
+        np.savez('bospec', xi=self.xi(), En=En, Cijn=Cijn, d1En=d1En, d1Hnm=d1Hnm, nac1=nac1, d2En=d2En, d2Hnm=d2Hnm)
+        return Cn
 
     # generate cap using Colbert-Miller syle DVR
     def wij(self, acap: float, bcap: float, ncap: int = 2) -> np.ndarray:
         return dvr_W(self.a, self.b, self.N, acap, bcap, ncap, self.bounds)
 
     def W(self, acap: float, bcap: float, ncap: int = 2):
+        dij = np.eye(self.ndvr)
+        nij = (1 - (1 - 1 / np.sqrt(2)) * dij)
+        wij = self.wij(acap, bcap, ncap)
+        wi = np.diag(wij)
+        match self.spin:
+            case "singlet":
+                def matvec(C):
+                    Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
+                    Cjl[self.map_ij, self.map_kl] = C; Cjl *= nij; Cjl += Cjl.T
+                    #Cik = nij * (np.matmul(wij, Cjl) + np.matmul(Cjl, wij.conj().T))
+                    Cik = nij * (wi[:,None] * Cjl + Cjl * wi.conj()[None,:])
+                    return Cik[self.map_ij, self.map_kl]
+            case "triplet":
+                def matvec(C):
+                    Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
+                    Cjl[self.map_ij, self.map_kl] = C; Cjl -= Cjl.T
+                    Cik = (np.matmul(wij, Cjl) + np.matmul(Cjl, wij.conj().T))
+                    return Cik[self.map_ij, self.map_kl]
+        return LinearOperator(shape=(self.nfci, self.nfci), matvec=matvec, dtype=np.complex128)
+
+    def Wold(self, acap: float, bcap: float, ncap: int = 2):
         dij = np.eye(self.ndvr)
         nij = (1 - (1 - 1 / np.sqrt(2)) * dij)
         wij = self.wij(acap, bcap, ncap)

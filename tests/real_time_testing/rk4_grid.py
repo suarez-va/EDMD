@@ -14,39 +14,83 @@ params = {
     "bee": 0.0001,
 }
 
-model = TEGD(a=-200, b=200, N=750, bounds="(-inf,inf)", spin="singlet", model_params=params)
-#model = TEGD(a=-200, b=200, N=500, bounds="(-inf,inf)", spin="singlet", model_params=params)
+R = 8.0
+eta = 1e-04
+acap = -50.0
+bcap = 50.0
+ncap = 2
+
+model = TEGD(a=-196.7/2.0, b=196.7/2.0, N=250, bounds="(-inf,inf)", spin="singlet", model_params=params)
+h = model.hij(R = R)
+w = model.wij(acap=acap, bcap=bcap, ncap=ncap)
+heta = h - 1j * eta * w
+pt = np.zeros((model.ndvr, model.ndvr), dtype=np.complex128)
+
 ep, cip = model.solve_mos(R = 8.0)
 ci1 = cip[:,1]
 ci2 = cip[:,2]
 S12 = 1.0 / np.sqrt(2) * (ci1[:,None] * ci2[None,:] + ci2[:,None] * ci1[None,:])
+Cijt = S12
 
-St0 = model.wfn_to_vec(S12)
+Ct = model.wfn_to_vec(Cijt)
 Hop = model.H(R = 8.0)
+Wop = model.W(acap=acap, bcap=bcap, ncap=ncap)
 
-Cn = St0
-print(np.sum(Cn.conj() * Cn))
-dt = 0.01
-nrk4 = 50000
+print(np.sum(Ct.conj() * Ct))
+dt = 0.0025
+nrk4 = 250000
 nprint = 1000
 xi = model.xi()
 tpts = int(np.ceil(nrk4 / nprint))
 time = dt * nprint * np.arange(tpts)
-rhot = np.zeros((model.ndvr, tpts), dtype=np.float64)
+print(f'tpts: {tpts}')
+print(f'tfinal: {time[-1]}')
+
+nt = 0j
+n1t = np.zeros((model.ndvr, tpts), dtype=np.float64)
+n2t = np.zeros((model.ndvr, tpts), dtype=np.float64)
+
 t = 0
 for i in range(nrk4):
     if i % nprint == 0:
         print(time[t])
-        print(np.sum(Cn.conj() * Cn))
-        Cij = model.vec_to_wfn(Cn)
-        rhot[:,t] = 2*np.sum(Cij.conj() * Cij, axis=1).real
+        n0e = 2 * nt
+        n1e = 2 * np.linalg.trace(pt)
+        n2e = np.sum(Ct.conj()*Ct)
+        print(f"n0e: {n0e}")
+        print(f"n1e: {n1e}")
+        print(f"n2e: {n2e}")
+        print(f"total: {n0e + n1e + n2e}")
+        Cijt = model.vec_to_wfn(Ct)
+        n1t[:,t] = 2 * np.diag(pt).real
+        n2t[:,t] = 2 * np.sum(Cijt.conj() * Cijt, axis=1).real
         t += 1
-    k1 = -1j * Hop.matvec(Cn)
-    k2 = -1j * Hop.matvec(Cn + 0.5 * dt * k1)
-    k3 = -1j * Hop.matvec(Cn + 0.5 * dt * k2)
-    k4 = -1j * Hop.matvec(Cn + dt * k3)
-    Cn += dt / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4)
-np.savez('timedata', t=time, xi=xi, rhot=rhot)
+
+    Cijt = model.vec_to_wfn(Ct); Lijt = 2 * eta * np.matmul(np.diag(w)[None,:] * Cijt, Cijt.conj().T)
+    nk1 = 2 * eta * np.sum(np.diag(w) * np.diag(pt))
+    pk1 = -1j * (np.matmul(heta, pt) - np.matmul(pt, heta.conj().T)) + Lijt
+    Ck1 = -1j * (Hop.matvec(Ct) - 1j * eta * Wop.matvec(Ct))
+    
+    Cijt = model.vec_to_wfn(Ct + 0.5 * dt * Ck1); Lijt = 2 * eta * np.matmul(np.diag(w)[None,:] * Cijt, Cijt.conj().T)
+    nk2 = 2 * eta * np.sum(np.diag(w) * np.diag(pt + 0.5 * dt * pk1))
+    pk2 = -1j * (np.matmul(heta, pt + 0.5 * dt * pk1) - np.matmul(pt + 0.5 * dt * pk1, heta.conj().T)) + Lijt
+    Ck2 = -1j * (Hop.matvec(Ct + 0.5 * dt * Ck1) - 1j * eta * Wop.matvec(Ct + 0.5 * dt * Ck1))
+   
+    Cijt = model.vec_to_wfn(Ct + 0.5 * dt * Ck2); Lijt = 2 * eta * np.matmul(np.diag(w)[None,:] * Cijt, Cijt.conj().T)
+    nk3 = 2 * eta * np.sum(np.diag(w) * np.diag(pt + 0.5 * dt * pk2))
+    pk3 = -1j * (np.matmul(heta, pt + 0.5 * dt * pk2) - np.matmul(pt + 0.5 * dt * pk2, heta.conj().T)) + Lijt
+    Ck3 = -1j * (Hop.matvec(Ct + 0.5 * dt * Ck2) - 1j * eta * Wop.matvec(Ct + 0.5 * dt * Ck2))
+
+    Cijt = model.vec_to_wfn(Ct + dt * Ck3); Lijt = 2 * eta * np.matmul(np.diag(w)[None,:] * Cijt, Cijt.conj().T)
+    nk4 = 2 * eta * np.sum(np.diag(w) * np.diag(pt + dt * pk3))
+    pk4 = -1j * (np.matmul(heta, pt + dt * pk3) - np.matmul(pt + dt * pk3, heta.conj().T)) + Lijt
+    Ck4 = -1j * (Hop.matvec(Ct + dt * Ck3) - 1j * eta * Wop.matvec(Ct + dt * Ck3))
+
+    nt += dt / 6.0 * (nk1 + 2 * nk2 + 2 * nk3 + nk4)
+    pt += dt / 6.0 * (pk1 + 2 * pk2 + 2 * pk3 + pk4)
+    Ct += dt / 6.0 * (Ck1 + 2 * Ck2 + 2 * Ck3 + Ck4)
+
+np.savez('timedata', t=time, xi=xi, n1t=n1t, n2t=n2t)
 exit()
 
 
