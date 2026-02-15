@@ -1,22 +1,24 @@
-from model_systems.models import GICD
-from time_independent.one_electron_fixed_nuclei import OneElectronFixedNuclei
+import numpy as np
+from models.model_utils import matmat
+from models.two_electron_diatomic import TEGD
 
 params = {
-    'ZA': 0.5,
-    'ZB': 0.5,
-    'aR': 0.0,
-    'bR': 0.0001,
-    'DA' : 1.0,
-    'bA': 0.25,
-    'DB' : 0.8,
-    'bB': 1.0,
-    'aee': 0.0,
-    'bee': 0.0001,
+    "aR": 0.0,
+    "bR": 0.0001,
+    "DA" : 1.0,
+    "bA": 0.25,
+    "DB" : 0.8,
+    "bB": 1.0,
+    "aee": 0.0,
+    "bee": 0.0001,
 }
 
-model = GICD(params)
-oefn = OneElectronFixedNuclei(model=model, xa=-196.7/2.0, xb=196.7/2.0, xN=500, xbounds="(-inf,inf)")
-oefn.solve_mos(R = R_sub, nmo = oefn.nxdvr)
+model = TEGD(a=-196.7/2.0, b=196.7/2.0, N=500, bounds="(-inf,inf)", spin="singlet", model_params=params)
+
+cip = model.solve_mos(R = R_sub)
+wi = model.wi(acap = -50.0, bcap = 50.0, ncap = 2)
+wpq = cip.conj().T @ (wi[:,None] * cip)
+np.savez("moops", wi = wi, wpq = wpq)
 
 
 #Cn = model.solve_bo(R = R_sub, nbo = 500)

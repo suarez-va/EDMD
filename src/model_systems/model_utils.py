@@ -100,28 +100,36 @@ class Model(ABC):
 
     # generate hcore using Colbert-Miller syle DVR
     def hij(self, R: float) -> np.ndarray:
-        xi=self.xi()
-        return dvr_T(1, self.a, self.b, self.N, self.bounds) + np.diag(self.VeR(xi, R))
+        return dvr_T(1, self.a, self.b, self.N, self.bounds) + np.diag(self.VeR(self.xi(), R))
 
     # generate derivative of hcore with respect to R using Colbert-Miller syle DVR for kinetic energy
     def d1hij(self, R: float) -> np.ndarray:
-        xi=self.xi()
-        return np.diag(self.d1VeR(xi, R))
+        return np.diag(self.d1VeR(self.xi(), R))
 
     def d2hij(self, R: float) -> np.ndarray:
+        return np.diag(self.d2VeR(self.xi(), R))
+
+    # generate cap using Colbert-Miller syle DVR
+    def wi(self, acap: float, bcap: float, ncap: int = 2) -> np.ndarray:
         xi=self.xi()
-        return np.diag(self.d2VeR(xi, R))
+        return (xi - bcap)**ncap * np.heaviside(xi - bcap, 0.5) + np.abs(xi - acap)**ncap * np.heaviside(-(xi - acap), 0.5)
 
     def Vik(self) -> np.ndarray:
         xi=self.xi()
         return self.Vee(xi[:,None],xi[None,:])
 
     def solve_mos(self, R: float):
-        hij = self.hij(R)
-        ep, cip = eigh(hij)
+        ep, cip = eigh(self.hij(R))
 
-        hpq = np.matmul(cip.conj().T, np.matmul(hij, cip))
-        np.savez('mospec', xi=self.xi(), ep=ep, cip=cip, hpq=hpq)
+        d1hpq = cip.conj().T @ self.d1hij(R) @ cip
+        d1ep = np.diag(d1hpq.real)
+        nac1 = solve_nac1(ep, d1hpq)
+        d2hpq = cip.conj().T @ self.d2hij(R) @ cip
+        d2ep = solve_d2En(ep, d1hpq, d2hpq)
+        # This is wrong obviously
+        nac2 = nac1 @ nac1
+
+        np.savez('mospec', xi=self.xi(), ep=ep, cip=cip, d1hpq=d1hpq, d1ep=d1ep, nac1=nac1, d2hpq=d2hpq, d2ep=d2ep, nac2=nac2)
         return cip
 
     def wfn_to_vec(self, Cijn):
@@ -176,7 +184,7 @@ class Model(ABC):
                 def matvec(C):
                     Cjl = np.zeros((self.ndvr, self.ndvr), dtype=np.complex128)
                     Cjl[self.map_ij, self.map_kl] = C; Cjl *= nij; Cjl += Cjl.T
-                    hC = np.matmul(hij, Cjl)
+                    hC = hij @ Cjl
                     Cik = nij * (hC + hC.T + Vik * Cjl)
                     #Cik = nij * (np.matmul(hij, Cjl) + np.matmul(Cjl, hij.conj().T) + Vik * Cjl)
                     return Cik[self.map_ij, self.map_kl]
@@ -187,6 +195,8 @@ class Model(ABC):
                     Cik = (np.matmul(hij, Cjl) + np.matmul(Cjl, hij.conj().T) + Vik * Cjl)
                     return Cik[self.map_ij, self.map_kl]
         return LinearOperator(shape=(self.nfci, self.nfci), matvec=matvec, dtype=np.complex128)
+
+    #def O(self, R: float, oij):
 
     def d1H(self, R: float):
         dij = np.eye(self.ndvr)
@@ -226,7 +236,7 @@ class Model(ABC):
                     return Cik[self.map_ij, self.map_kl]
         return LinearOperator(shape=(self.nfci, self.nfci), matvec=matvec, dtype=np.complex128)
 
-    def solve_bo(self, R: float, nbo: int = 100):
+    def solve_bos(self, R: float, nbo: int = 100):
         En, Cn = eigsh(self.H(R), k=nbo, which='SA')
         #En, Cn = eigsh(self.H(R), k=nbo, which='SA', ncv=~1.5*k, tol=1e-8)
         idx = np.argsort(En)

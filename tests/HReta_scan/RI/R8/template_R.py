@@ -16,10 +16,10 @@ params = {
 
 model = GICD(params)
 oefn = OneElectronFixedNuclei(model=model, xa=-196.7/2.0, xb=196.7/2.0, xN=500, xbounds="(-inf,inf)")
-oefn.solve_mos(R = R_sub, nmo = oefn.nxdvr)
+oefn.solve_mos(R = 3.08000000000, nmo = oefn.nxdvr)
 
 
-#Cn = model.solve_bo(R = R_sub, nbo = 500)
+#Cn = model.solve_bo(R = 3.08000000000, nbo = 500)
 
 #Wab50n2 = np.matmul(Cn.conj().T, matmat(model.W(acap=-50.0, bcap=50.0, ncap=2), Cn))
 #np.savez("boops", Wab50n2=Wab50n2)

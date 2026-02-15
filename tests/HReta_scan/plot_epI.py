@@ -12,7 +12,7 @@ RI = np.loadtxt("RI/RI.dat", dtype=np.float64)
 nmo = mospec_0["ep"].shape[0]
 Ipts = RI.shape[0]
 epI = np.zeros((nmo,Ipts), dtype=np.float64)
-nac = np.zeros((Ipts), dtype=np.complex128)
+nac = np.zeros((Ipts), dtype=np.float64)
 for I, R in enumerate(RI):
     sub_dir = f"RI/R{I}"
     mospec = np.load(sub_dir + "/mospec.npz")
@@ -42,21 +42,13 @@ plt.rcParams.update({
     'legend.frameon': False,
 })
 
-pmax = 23
-
-fig, (ax1, ax2) = plt.subplots(2,1)
-#ax1.set_xlim(-1.0, 0.0)
-#ax1.set_ylim(0.06, 0.1)
-ax1.set_xlabel('R (a.u.)')
-ax1.set_ylabel('ε(R) (a.u.)')
-
-ax1.plot(RI, epI[23,:] - epI[22,:])
-#ax1.plot(RI, epI[22,:])
-#ax1.plot(RI, epI[23,:])
-ax2.plot(RI, nac.real, color='r')
-ax2.plot(RI, nac.imag, color='b')
-#for p in range(pmax):
-#    ax.plot(RI, epI[p,:])
+fig, ax = plt.subplots()
+#ax.set_xlim(-1.0, 0.0)
+ax.set_ylim(-1.5, 0.1)
+ax.set_xlabel('R (a.u.)')
+ax.set_ylabel('ε(R) (a.u.)')
+for p in range(nmo):
+    ax.plot(RI, epI[p,:])
 
 #plt.show()
 

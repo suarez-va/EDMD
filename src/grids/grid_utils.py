@@ -3,9 +3,9 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 def create_R_grid(Ra, Rb, RN, template_file):
-    os.makedirs("Rk", exist_ok=True)
-    Rk = np.linspace(Ra, Rb, RN+1)
-    np.savetxt(os.path.join("Rk", "Rk.dat"), Rk)
+    os.makedirs("RI", exist_ok=True)
+    RI = np.linspace(Ra, Rb, RN+1)
+    np.savetxt(os.path.join("RI", "RI.dat"), RI)
 
     if not os.path.exists(template_file):
         print(f"Error: Template file '{template_file}' not found.")
@@ -14,8 +14,8 @@ def create_R_grid(Ra, Rb, RN, template_file):
     with open(template_file, "r") as f:
         template_content = f.read()
 
-    for k, R in enumerate(Rk):
-        sub_dir = os.path.join("Rk", f"R{k}")
+    for I, R in enumerate(RI):
+        sub_dir = os.path.join("RI", f"R{I}")
         os.makedirs(sub_dir, exist_ok=True)
 
         #R = Ra + k * (Rb - Ra) / RN
@@ -26,13 +26,123 @@ def create_R_grid(Ra, Rb, RN, template_file):
 
     return None
 
-def sort_R_grid():
-    if not os.path.exists("Rk"):
-        print("Missing grid data directory Rk")
+def sort_R_grid_mos():
+    if not os.path.exists("RI"):
+        print("Missing grid data directory RI")
         exit()
-    Rk = np.loadtxt("Rk/Rk.dat", dtype=np.float64)
+    RI = np.loadtxt("RI/RI.dat", dtype=np.float64)
 
-    eigspec_0 = np.load("Rk/R0/eigspec.npz")
+    for I, R in enumerate(RI):
+        print(I)
+        sub_dir_curr = f"RI/R{I}"
+        mospec_curr = np.load(sub_dir_curr + "/mospec.npz")
+        xi_curr = mospec_curr['xi']; ep_curr = mospec_curr['ep']; cip_curr = mospec_curr['cip']
+        xpq_curr = mospec_curr['xpq']#; ppq_curr = mospec_curr['ppq']; Ppq_curr = mospec_curr['Tpq']
+        d1hpq_curr = mospec_curr['d1hpq']; d1ep_curr = mospec_curr['d1ep']; nac1_curr = mospec_curr['nac1']
+        d2hpq_curr = mospec_curr['d2hpq']; d2ep_curr = mospec_curr['d2ep']; nac2_curr = mospec_curr['nac2']
+        nmo = ep_curr.shape[0]
+
+        if I == 0:
+            theta = np.zeros((nmo), dtype=np.float64)
+            for p in range(nmo):
+                imax = np.argmax(np.abs(cip_curr[:,p]))
+                theta[p] = -np.angle(cip_curr[imax,p])
+        else:
+            sub_dir_prev = f"RI/R{I-1}"
+            mospec_prev = np.load(sub_dir_prev + "/mospec.npz")
+            cip_prev = mospec_prev['cip']
+            M_prev = np.abs(cip_prev); A_prev = np.angle(cip_prev)
+            M_curr = np.abs(cip_curr); A_curr = np.angle(cip_curr)
+            theta = -0.5 * np.sum((M_curr**2 + M_prev**2) * ((A_curr - A_prev + np.pi) % (2*np.pi) - np.pi), axis=0)
+
+        cip_curr = cip_curr * np.exp(1j * theta[None,:])
+        xpq_curr = xpq_curr * np.exp(-1j * (theta[:,None] - theta[None,:]))
+        d1hpq_curr = d1hpq_curr * np.exp(-1j * (theta[:,None] - theta[None,:]))
+        nac1_curr = nac1_curr * np.exp(-1j * (theta[:,None] - theta[None,:]))
+        d2hpq_curr = d2hpq_curr * np.exp(-1j * (theta[:,None] - theta[None,:]))
+        nac2_curr = nac2_curr * np.exp(-1j * (theta[:,None] - theta[None,:]))
+
+        np.savez(sub_dir_curr + '/mospec', xi=xi_curr, ep=ep_curr, cip=cip_curr, xpq=xpq_curr, d1hpq=d1hpq_curr, d1ep=d1ep_curr, nac1=nac1_curr, d2hpq=d2hpq_curr, d2ep=d2ep_curr, nac2=nac2_curr)
+
+    return None
+
+
+def sort_R_grid_mos_old():
+    if not os.path.exists("RI"):
+        print("Missing grid data directory RI")
+        exit()
+    RI = np.loadtxt("RI/RI.dat", dtype=np.float64)
+
+    for I, R in enumerate(RI):
+        print(I)
+        sub_dir_curr = f"RI/R{I}"
+        mospec_curr = np.load(sub_dir_curr + "/mospec.npz")
+        xi_curr = mospec_curr['xi']; ep_curr = mospec_curr['ep']; cip_curr = mospec_curr['cip']
+        xpq_curr = mospec_curr['xpq']#; ppq_curr = mospec_curr['ppq']; Ppq_curr = mospec_curr['Tpq']
+        d1hpq_curr = mospec_curr['d1hpq']; d1ep_curr = mospec_curr['d1ep']; nac1_curr = mospec_curr['nac1']
+        d2hpq_curr = mospec_curr['d2hpq']; d2ep_curr = mospec_curr['d2ep']; nac2_curr = mospec_curr['nac2']
+        nmo = ep_curr.shape[0]
+
+        if I == 0:
+            theta = np.zeros((nmo), dtype=np.float64)
+            #ep_old = 0
+            #d1ep_old = 0
+            #cip_prev = cip_curr
+            #cip_old = cip_curr
+            #nac1_prev = nac1_curr
+            #nac1_old = nac1_curr
+            #nac2_prev = nac2_curr
+            for p in range(nmo):
+                imax = np.argmax(np.abs(cip_curr[:,p]))
+                theta[p] = -np.angle(cip_curr[imax,p])
+        else:
+            sub_dir_prev = f"RI/R{I-1}"
+            mospec_prev = np.load(sub_dir_prev + "/mospec.npz")
+            cip_prev = mospec_prev['cip']
+            #nac1_prev = mospec_prev['nac1']
+            M_prev = np.abs(cip_prev); A_prev = np.angle(cip_prev)
+            M_curr = np.abs(cip_curr); A_curr = np.angle(cip_curr)
+            theta = -0.5 * np.sum((M_curr**2 + M_prev**2) * ((A_curr - A_prev + np.pi) % (2*np.pi) - np.pi), axis=0)
+            
+            #nsta = 1
+            #DR = RI[1] - RI[0]
+            #ep_prev = mospec_prev['ep']
+            #d1ep_prev = mospec_prev['d1ep']
+            #d2ep_prev = mospec_prev['d2ep']
+            #d1ep_approx1 = ((ep_curr - ep_prev) / DR)
+            #d1ep_approx2 = ((ep_prev - ep_old) / DR)
+            #d2ep_approx0 = ((ep_curr - 2*ep_prev + ep_old) / (DR**2))
+            #d2ep_approx1 = ((d1ep_curr - d1ep_prev) / DR)
+            #d2ep_approx2 = ((d1ep_prev - d1ep_old) / DR)
+            ##print(f'1: {d1ep_approx1[nsta]}, 2: {d1ep_approx2[nsta]}, res: {d1ep_prev[nsta]}')
+            ##print(f'0: {d2ep_approx0[nsta]}, 1: {d2ep_approx1[nsta]}, 2: {d2ep_approx2[nsta]}, res: {d2ep_prev[nsta]}')
+            #ep_old = ep_prev
+            #d1ep_old = d1ep_prev
+            #nac1_prev = mospec_prev['nac1']
+            #nac2_prev = mospec_prev['nac2']
+
+        cip_curr = cip_curr * np.exp(1j * theta[None,:])
+        xpq_curr = xpq_curr * np.exp(-1j * (theta[:,None] - theta[None,:]))
+        d1hpq_curr = d1hpq_curr * np.exp(-1j * (theta[:,None] - theta[None,:]))
+        nac1_curr = nac1_curr * np.exp(-1j * (theta[:,None] - theta[None,:]))
+        d2hpq_curr = d2hpq_curr * np.exp(-1j * (theta[:,None] - theta[None,:]))
+        nac2_curr = nac2_curr * np.exp(-1j * (theta[:,None] - theta[None,:]))
+
+        #DR = RI[1] - RI[0]
+        #print(f'0: {(cip_prev.conj().T @ cip_curr)[22,23]/DR}, res: {nac1_prev[22,23]}')
+        #print(f'0: {(cip_prev.conj().T @ cip_curr + cip_prev.conj().T @ cip_old)[22,23]/(DR**2)}, res: {nac2_prev[22,23]}')
+        #cip_old=cip_prev
+        np.savez(sub_dir_curr + '/mospec', xi=xi_curr, ep=ep_curr, cip=cip_curr, xpq=xpq_curr, d1hpq=d1hpq_curr, d1ep=d1ep_curr, nac1=nac1_curr, d2hpq=d2hpq_curr, d2ep=d2ep_curr, nac2=nac2_curr)
+
+    return None
+
+def sort_R_grid_old():
+    if not os.path.exists("RI"):
+        print("Missing grid data directory RI")
+        exit()
+    RI = np.loadtxt("RI/RI.dat", dtype=np.float64)
+
+    eigspec_0 = np.load("RI/R0/eigspec.npz")
     xi_0 = eigspec_0['xi']; En_0 = eigspec_0['En']; Cijn_0 = eigspec_0['Cijn']
     d1En_0 = eigspec_0['d1En']; d1Hnm_0 = eigspec_0['d1Hnm']; nac1_0 = eigspec_0['nac1']
     d2En_0 = eigspec_0['d2En']; d2Hnm_0 = eigspec_0['d2Hnm']
@@ -46,18 +156,18 @@ def sort_R_grid():
     d1Hnm_0 = d1Hnm_0 * np.exp(-1j * (Tn_0[:,None] - Tn_0[None,:]))
     nac1_0 = nac1_0 * np.exp(-1j * (Tn_0[:,None] - Tn_0[None,:]))
     d2Hnm_0 = d2Hnm_0 * np.exp(-1j * (Tn_0[:,None] - Tn_0[None,:]))
-    np.savez("Rk/R0/eigspec2", xi=xi_0, En=En_0, Cijn=Cijn_0, d1En=d1En_0, d1Hnm=d1Hnm_0, nac1=nac1_0, d2En=d2En_0, d2Hnm=d2Hnm_0)
-    if os.path.isfile("Rk/R0/boops.npz"):
+    np.savez("RI/R0/eigspec2", xi=xi_0, En=En_0, Cijn=Cijn_0, d1En=d1En_0, d1Hnm=d1Hnm_0, nac1=nac1_0, d2En=d2En_0, d2Hnm=d2Hnm_0)
+    if os.path.isfile("RI/R0/boops.npz"):
         boops = {}
-        boops_0 = np.load("Rk/R0/boops.npz")
+        boops_0 = np.load("RI/R0/boops.npz")
         for key in boops_0.files:
             boops[key] = boops_0[key] * np.exp(-1j * (Tn_0[:,None] - Tn_0[None,:]))
-        np.savez("Rk/R0/boops2", **boops)
+        np.savez("RI/R0/boops2", **boops)
 
-    for k, R in enumerate(Rk[1:], start=1):
+    for k, R in enumerate(RI[1:], start=1):
         print(k)
-        sub_dir_prev = f"Rk/R{k-1}"
-        sub_dir_curr = f"Rk/R{k}"
+        sub_dir_prev = f"RI/R{k-1}"
+        sub_dir_curr = f"RI/R{k}"
         eigspec_prev = np.load(sub_dir_prev + "/eigspec2.npz")
         eigspec_curr = np.load(sub_dir_curr + "/eigspec.npz")
         Cijn_prev = eigspec_prev['Cijn']

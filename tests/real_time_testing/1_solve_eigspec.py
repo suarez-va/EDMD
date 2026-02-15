@@ -20,12 +20,14 @@ acap = -50.0
 bcap = 50.0
 ncap = 2
 
-Cn = model.solve_bo(R = R, nbo = 225)
-Wnm = np.matmul(Cn.conj().T, matmat(model.W(acap = acap, bcap = bcap, ncap = ncap), Cn))
-np.savez("boops", Wnm=Wnm)
-
 cip = model.solve_mos(R = R)
 wij = model.wij(acap = acap, bcap = bcap, ncap = ncap)
 wk = np.diag(wij)
 wpq = np.matmul(cip.conj().T, np.matmul(wij, cip))
 np.savez("moops", wk = wk, wpq = wpq)
+
+Cn = model.solve_bo(R = R, nbo = 225)
+Wnm = np.matmul(Cn.conj().T, matmat(model.W(acap = acap, bcap = bcap, ncap = ncap), Cn))
+np.savez("boops", Wnm=Wnm)
+
+
