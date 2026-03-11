@@ -21,6 +21,10 @@ model = GICD(params)
 fcidvr = FCIDVR(model = model, xa = -50.0, xb = 49.9, xN = 750, xbounds = "(-inf,inf)")
 #fcidvr = FCIDVR(model = model, xa = -196.7/2.0, xb = 196.7/2.0, xN = 500, xbounds = "(-inf,inf)")
 
+#R_sub = 8.0
+#d2H = fcidvr.CIoperator(nele = , spin, fcidvr.d2hij(R_sub))
+#d2Hnm = Cn.conj().T @ d2H.matmat(Cn) + self.model.d2VR(R) * np.eye(nbo)
+
 ndvr = fcidvr.nxdvr
 nfci2, nmap2, CImap2 = fcidvr.CImapping(nele = 2, spin = 'singlet')
 #nfci3, nmap3, CImap3 = fcidvr.CImapping(nele = 3, spin = 'doublet')

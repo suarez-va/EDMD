@@ -2,26 +2,30 @@ import numpy as np
 
 import itertools
 
-a = np.array([0,0,0,0,1,1,1,1])
-b = np.array([0,0,1,1,0,0,1,1])
-c = np.array([0,1,0,1,0,1,0,1])
-d = np.random.random((2,2))
-e = d[a,b]
-print(d)
-print(e)
-exit()
+#a = np.array([0,0,0,0,1,1,1,1])
+#b = np.array([0,0,1,1,0,0,1,1])
+#c = np.array([0,1,0,1,0,1,0,1])
+#d = np.random.random((2,2))
+#e = d[a,b]
+#print(d)
+#print(e)
+#exit()
 
 npts = 5
 a = np.arange(npts**3)
 b = a.reshape(npts, npts, npts)
 c = b.transpose(2,0,1)
-d = b.swapaxes(1,2).swapaxes(0,1)
 i = 2
 j = 3
 k = 1
 print(b[j,k,i])
 print(c[i,j,k])
-print(d[i,j,k])
+
+print(b[i,j,k])
+print(c[k,i,j])
+exit()
+#d = b.swapaxes(1,2).swapaxes(0,1)
+#print(d[i,j,k])
 
 e = b.transpose(1,2,0)
 print(b[k,i,j])

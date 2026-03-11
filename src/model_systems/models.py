@@ -90,6 +90,63 @@ class GICD(Model):
         return np.exp(-aee * xarg) / np.sqrt(xarg + bee)
 
 
+class BHAR(Model):
+    def __init__(self, model_params: dict):
+        super().__init__(model_params)
+
+    def VR(self, R):
+        ZA = self.params["ZA"]
+        ZB = self.params["ZB"]
+        aR = self.params["aR"]
+        bR = self.params["bR"]
+        k = self.params["k"]
+        mu_mA = self.params["mu_mA"]
+        kM = k*((mu_mA - 0.5)**2 + 0.25)
+        return ZA * ZB * np.exp(-aR * R**2) / np.sqrt(R**2 + bR) + kM * R**2
+
+    def d1VR(self, R):
+        ZA = self.params["ZA"]
+        ZB = self.params["ZB"]
+        aR = self.params["aR"]
+        bR = self.params["bR"]
+        k = self.params["k"]
+        mu_mA = self.params["mu_mA"]
+        kM = k*((mu_mA - 0.5)**2 + 0.25)
+        GR = -R * (2 * aR + 1 / (R**2 + bR))
+        return GR * ZA * ZB * np.exp(-aR * R**2) / np.sqrt(R**2 + bR) + 2 * kM * R
+
+    def d2VR(self, R):
+        ZA = self.params["ZA"]
+        ZB = self.params["ZB"]
+        aR = self.params["aR"]
+        bR = self.params["bR"]
+        k = self.params["k"]
+        mu_mA = self.params["mu_mA"]
+        kM = k*((mu_mA - 0.5)**2 + 0.25)
+        GR = -R * (2 * aR + 1 / (R**2 + bR))
+        dGR = -(2 * aR + 1 / (R**2 + bR)) + 2 * R**2 / ((R**2 + bR)**2)
+        return (dGR + GR**2) * ZA * ZB * np.exp(-aR * R**2) / np.sqrt(R**2 + bR) + 2 * kM
+
+    def VeR(self, x, R):
+        k = self.params["k"]
+        mu_mA = self.params["mu_mA"]
+        return k * x * (x + 2 * (mu_mA - 0.5) * R)
+
+    def d1VeR(self, x, R):
+        k = self.params["k"]
+        mu_mA = self.params["mu_mA"]
+        return 2 * k * (mu_mA - 0.5) * x
+
+    def d2VeR(self, x, R):
+        return np.zeros_like(x)
+
+    def Vee(self, x1, x2):
+        aee = self.params["aee"]
+        bee = self.params["bee"]
+        xarg = (x1 - x2)**2
+        return np.exp(-aee * xarg) / np.sqrt(xarg + bee)
+
+
 #class TESD(Model):
 #    def __init__(self, a: float, b: float, N: int, bounds: str, spin: str, model_params: dict):
 #        super().__init__(a, b, N, bounds, spin, model_params)
