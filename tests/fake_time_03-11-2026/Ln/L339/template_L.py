@@ -1,4 +1,3 @@
-import numpy as np
 from model_systems.models import GICD
 from time_independent.fcidvr import FCIDVR, compute_density, compute_dyson, compute_cap
 
@@ -18,7 +17,7 @@ params = {
 R = 8.0
 
 L = 439.00000000000
-xN = int(4*L)
+xN = int(2*L)
 
 nbo1 = 25
 nbo2 = 250
@@ -28,14 +27,3 @@ fcidvr = FCIDVR(model = model, xa = -L/2.0, xb = L/2.0, xN = xN, xbounds = "(-in
 
 fcidvr.kernel(R = R, nele = 1, spin = 'doublet', nbo = nbo1, derivative_order = 0)
 fcidvr.kernel(R = R, nele = 2, spin = 'singlet', nbo = nbo2, derivative_order = 0)
-
-#compute_density(fcidvr_file = 'fcidvr_1ele_doublet.npz', Sz = 0.5)
-#compute_density(fcidvr_file = 'fcidvr_1ele_doublet.npz', Sz = -0.5)
-#compute_density(fcidvr_file = 'fcidvr_2ele_singlet.npz', Sz = 0.0)
-
-#compute_dyson('fcidvr_1ele_doublet.npz', 0.5, 'fcidvr_2ele_singlet.npz', 0.0)
-#compute_dyson('fcidvr_1ele_doublet.npz', -0.5, 'fcidvr_2ele_singlet.npz', 0.0)
-
-#compute_cap(fcidvr_file = 'fcidvr_1ele_doublet.npz', acap = acap, bcap = bcap, ncap = ncap)
-#compute_cap(fcidvr_file = 'fcidvr_2ele_singlet.npz', acap = acap, bcap = bcap, ncap = ncap)
-
